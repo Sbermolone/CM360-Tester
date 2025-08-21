@@ -2,76 +2,94 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CM360 Tag Viewer (Inline Dynamic)</title>
+  <title>CM360 Tag Viewer (Pixel Tracker)</title>
   <style>
     body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
     #creative { width: 50%; height: 100%; padding: 10px; border-right: 1px solid #ccc; overflow: auto; }
     #log { width: 50%; height: 100%; padding: 10px; background: #f5f5f5; overflow-y: auto; }
-    .log-entry { font-size: 14px; padding: 4px 0; border-bottom: 1px solid #ddd; }
-    .timestamp { color: #888; font-size: 12px; margin-right: 6px; }
-    #controls { position: fixed; top: 10px; right: 10px; }
-    button { padding: 5px 10px; margin-left: 5px; }
+    h3 { margin-top: 0; }
+    .pixel-check { font-size: 14px; margin: 6px 0; }
+    .fired { color: green; font-weight: bold; }
+    .not-fired { color: red; }
   </style>
 </head>
 <body>
   <div id="creative"></div>
-  <div id="log"></div>
-
-  <div id="controls">
-    <button onclick="clearLog()">Clear Log</button>
+  <div id="log">
+    <h3>Pixel Tracker</h3>
+    <div id="pixelList"></div>
   </div>
 
   <script>
-    // Logging helper
-    function log(message) {
-      const el = document.createElement('div');
-      el.className = 'log-entry';
-      const time = new Date().toLocaleTimeString();
-      el.innerHTML = `<span class="timestamp">[${time}]</span> ${message}`;
-      document.getElementById('log').appendChild(el);
-      document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
-    }
+    // List of pixels you care about (add more here)
+    const expectedPixels = [
+      { name: "RLCDN", match: "di.rlcdn.com" },
+      { name: "DoubleClick", match: "doubleclick.net" },
+      { name: "Meta/Facebook", match: "facebook.com/tr" },
+      { name: "Google Ads", match: "googleads.g.doubleclick.net" },
+      { name: "Generic IMG Pixel", match: ".gif" }
+    ];
 
-    function clearLog() {
-      document.getElementById('log').innerHTML = '';
-      log('Log cleared.');
+    // Render initial checklist
+    const pixelList = document.getElementById("pixelList");
+    expectedPixels.forEach(pixel => {
+      const el = document.createElement("div");
+      el.className = "pixel-check not-fired";
+      el.id = `pixel-${pixel.name}`;
+      el.textContent = `❌ ${pixel.name} not fired`;
+      pixelList.appendChild(el);
+    });
+
+    // Helper: mark a pixel as fired
+    function markPixelFired(name, url) {
+      const el = document.getElementById(`pixel-${name}`);
+      if (el && el.classList.contains("not-fired")) {
+        el.classList.remove("not-fired");
+        el.classList.add("fired");
+        el.textContent = `✅ ${name} fired (${url})`;
+      }
     }
 
     // Hook network calls
+    function checkPixels(url) {
+      expectedPixels.forEach(pixel => {
+        if (url.includes(pixel.match)) {
+          markPixelFired(pixel.name, url);
+        }
+      });
+    }
+
     const origOpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function() {
-      log(`XHR: ${arguments[1]}`);
+      checkPixels(arguments[1]);
       return origOpen.apply(this, arguments);
     };
 
     const origFetch = window.fetch;
     window.fetch = function() {
-      log(`Fetch: ${arguments[0]}`);
+      checkPixels(arguments[0]);
       return origFetch.apply(this, arguments);
     };
 
     const OrigImage = Image;
     window.Image = function(width, height) {
       const img = new OrigImage(width, height);
-      Object.defineProperty(img, 'src', {
+      Object.defineProperty(img, "src", {
         set: function(url) {
-          log(`Pixel Load: ${url}`);
-          img.setAttribute('src', url);
+          checkPixels(url);
+          img.setAttribute("src", url);
         }
       });
       return img;
     };
 
-    // Grab ?tag= from URL
+    // Inject the creative (inline)
     const params = new URLSearchParams(window.location.search);
     const rawTag = decodeURIComponent(params.get("tag") || "");
-
     if (rawTag) {
-      // Inject tag directly
       document.getElementById("creative").innerHTML = rawTag;
-      log("Creative injected inline.");
     } else {
-      log("No tag provided.");
+      document.getElementById("creative").innerHTML = "<p>No tag provided.</p>";
     }
   </script>
 </body>

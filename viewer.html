@@ -237,53 +237,100 @@
       networkLogElement.innerHTML = '';
     }
 
-    // Monitor network requests
+    // Monitor network requests more comprehensively
     function setupNetworkMonitoring() {
-      // Monitor image loads
-      const originalImage = Image;
+      // Override fetch to monitor API calls
+      const originalFetch = window.fetch;
+      window.fetch = function(...args) {
+        const url = args[0];
+        logNetworkActivity(url, 'success', 'Fetch request initiated');
+        checkPixelUrl(url);
+        return originalFetch.apply(this, args)
+          .then(response => {
+            if (response.ok) {
+              logNetworkActivity(url, 'success', 'Fetch request successful');
+            } else {
+              logNetworkActivity(url, 'error', `Fetch request failed: ${response.status}`);
+            }
+            return response;
+          })
+          .catch(error => {
+            logNetworkActivity(url, 'error', `Fetch request error: ${error.message}`);
+            throw error;
+          });
+      };
+
+      // Override XMLHttpRequest to monitor AJAX calls
+      const originalXHR = window.XMLHttpRequest;
+      window.XMLHttpRequest = function() {
+        const xhr = new originalXHR();
+        const originalOpen = xhr.open;
+        
+        xhr.open = function(method, url, ...args) {
+          logNetworkActivity(url, 'success', `XHR ${method} request initiated`);
+          checkPixelUrl(url);
+          return originalOpen.apply(this, [method, url, ...args]);
+        };
+        
+        xhr.addEventListener('load', function() {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            logNetworkActivity(xhr.responseURL || 'XHR', 'success', `XHR request successful (${xhr.status})`);
+          } else {
+            logNetworkActivity(xhr.responseURL || 'XHR', 'error', `XHR request failed (${xhr.status})`);
+          }
+        });
+        
+        xhr.addEventListener('error', function() {
+          logNetworkActivity(xhr.responseURL || 'XHR', 'error', 'XHR request error');
+        });
+        
+        return xhr;
+      };
+
+      // Monitor image loads more thoroughly
+      const originalImage = window.Image;
       window.Image = function() {
         const img = new originalImage();
-        const originalSrc = img.src;
         
         Object.defineProperty(img, 'src', {
           set: function(value) {
+            logNetworkActivity(value, 'success', 'Image src set');
             checkPixelUrl(value);
-            originalImage.prototype.src = value;
+            
+            // Set up load/error handlers
             img.onload = function() {
-              logNetworkActivity(value, 'success', 'Image loaded');
+              logNetworkActivity(value, 'success', 'Image loaded successfully');
             };
             img.onerror = function() {
               logNetworkActivity(value, 'error', 'Image failed to load');
             };
-            return true;
+            
+            // Actually set the src
+            originalImage.prototype.src = value;
           },
           get: function() {
-            return originalSrc;
+            return originalImage.prototype.src;
           }
         });
         
         return img;
       };
 
-      // Monitor iframe loads  
-      const iframes = document.querySelectorAll('iframe');
-      iframes.forEach(iframe => {
-        const src = iframe.src;
-        if (src) {
-          checkPixelUrl(src);
-          logNetworkActivity(src, 'success', 'Iframe loaded');
+      // Monitor dynamic script additions
+      const originalAppendChild = Node.prototype.appendChild;
+      Node.prototype.appendChild = function(child) {
+        if (child.tagName === 'SCRIPT' && child.src) {
+          logNetworkActivity(child.src, 'success', 'Dynamic script added');
+          checkPixelUrl(child.src);
+        } else if (child.tagName === 'IMG' && child.src) {
+          logNetworkActivity(child.src, 'success', 'Dynamic image added');
+          checkPixelUrl(child.src);
+        } else if (child.tagName === 'IFRAME' && child.src) {
+          logNetworkActivity(child.src, 'success', 'Dynamic iframe added');
+          checkPixelUrl(child.src);
         }
-      });
-
-      // Monitor script loads
-      const scripts = document.querySelectorAll('script[src]');
-      scripts.forEach(script => {
-        const src = script.src;
-        if (src) {
-          checkPixelUrl(src);
-          logNetworkActivity(src, 'success', 'Script loaded');
-        }
-      });
+        return originalAppendChild.call(this, child);
+      };
     }
 
     function checkPixelUrl(url) {
@@ -353,48 +400,108 @@
           tagContainer.appendChild(tagElement);
           creativeDiv.appendChild(tagContainer);
           
-          // Monitor for iframe creation
+          // Monitor for iframe creation with more persistence
           let checkCount = 0;
           const checkForIframe = () => {
             checkCount++;
-            const dcmIframe = creativeDiv.querySelector('iframe');
             
-            if (dcmIframe) {
-              logNetworkActivity(dcmIframe.src || 'iframe', 'success', 'CM360 creative iframe detected');
+            // Check for iframes anywhere in the document, not just in creativeDiv
+            const allIframes = document.querySelectorAll('iframe');
+            const dcmIframe = Array.from(allIframes).find(iframe => 
+              iframe.src && (
+                iframe.src.includes('doubleclick.net') || 
+                iframe.src.includes('googleadservices.com') ||
+                iframe.closest('.dcmads') ||
+                iframe.getAttribute('data-dcm-placement')
+              )
+            );
+            
+            // Also check if any iframe was added to our creative container
+            const creativeIframe = creativeDiv.querySelector('iframe');
+            const targetIframe = dcmIframe || creativeIframe;
+            
+            if (targetIframe) {
+              logNetworkActivity(targetIframe.src || 'iframe-found', 'success', `CM360 iframe found (attempt ${checkCount})`);
               
               // Style the iframe container
               tagContainer.style.border = '2px solid #4CAF50';
-              tagContainer.querySelector('strong').textContent = 'CM360 Creative (Loaded):';
+              tagContainer.querySelector('strong').textContent = 'CM360 Creative (Iframe Found):';
+              
+              // Make sure iframe is visible and properly sized
+              targetIframe.style.display = 'block';
+              targetIframe.style.width = '300px';
+              targetIframe.style.height = '250px';
+              targetIframe.style.border = '1px solid #ccc';
               
               // Monitor the iframe source for pixel patterns
-              if (dcmIframe.src) {
-                checkPixelUrl(dcmIframe.src);
+              if (targetIframe.src) {
+                checkPixelUrl(targetIframe.src);
+                logNetworkActivity(targetIframe.src, 'success', 'Monitoring iframe src for pixels');
               }
               
               // Listen for iframe load
-              dcmIframe.onload = function() {
-                logNetworkActivity(dcmIframe.src, 'success', 'CM360 creative iframe loaded successfully');
+              targetIframe.onload = function() {
+                logNetworkActivity(targetIframe.src || 'iframe', 'success', 'CM360 iframe content loaded');
+                tagContainer.querySelector('strong').textContent = 'CM360 Creative (Fully Loaded):';
+                tagContainer.style.border = '2px solid #4CAF50';
+                
+                // Try to inspect iframe content after load (will likely fail due to CORS)
+                setTimeout(() => {
+                  try {
+                    if (targetIframe.contentDocument) {
+                      const iframeDoc = targetIframe.contentDocument;
+                      logNetworkActivity('iframe-content', 'success', 'Iframe content accessible');
+                      
+                      // Scan for pixels in iframe content
+                      const iframeScripts = iframeDoc.querySelectorAll('script[src]');
+                      const iframeImages = iframeDoc.querySelectorAll('img[src]');
+                      const iframeLinks = iframeDoc.querySelectorAll('a[href]');
+                      
+                      iframeScripts.forEach(script => {
+                        logNetworkActivity(script.src, 'success', 'Iframe script found');
+                        checkPixelUrl(script.src);
+                      });
+                      
+                      iframeImages.forEach(img => {
+                        logNetworkActivity(img.src, 'success', 'Iframe image found');
+                        checkPixelUrl(img.src);
+                      });
+                      
+                      iframeLinks.forEach(link => {
+                        if (link.href.includes('pixel') || link.href.includes('tracking')) {
+                          logNetworkActivity(link.href, 'success', 'Iframe tracking link found');
+                          checkPixelUrl(link.href);
+                        }
+                      });
+                    }
+                  } catch (e) {
+                    logNetworkActivity('iframe-content', 'error', `Cannot access iframe content: ${e.message}`);
+                  }
+                }, 500);
               };
               
-              dcmIframe.onerror = function() {
-                logNetworkActivity(dcmIframe.src, 'error', 'CM360 creative iframe failed to load');
+              targetIframe.onerror = function() {
+                logNetworkActivity(targetIframe.src, 'error', 'CM360 iframe failed to load');
+                tagContainer.style.border = '2px solid #F44336';
+                tagContainer.querySelector('strong').textContent = 'CM360 Creative (Iframe Error):';
               };
               
-            } else if (checkCount < 10) {
-              // Keep checking for up to 5 seconds
-              logNetworkActivity('iframe-check', 'success', `Checking for iframe creation (attempt ${checkCount})`);
+            } else if (checkCount < 20) { // Check for 10 seconds
+              logNetworkActivity('iframe-check', 'success', `Checking for iframe... (${checkCount}/20)`);
               setTimeout(checkForIframe, 500);
             } else {
-              // No iframe found after 5 seconds
-              logNetworkActivity('CM360', 'error', 'Timeout: No iframe created by dcmads.js');
+              // No iframe found after 10 seconds
+              logNetworkActivity('CM360', 'error', 'Timeout: No iframe created by dcmads.js after 10 seconds');
               tagContainer.style.border = '2px solid #F44336';
-              tagContainer.querySelector('strong').textContent = 'CM360 Creative (Failed - No iframe created):';
+              tagContainer.querySelector('strong').textContent = 'CM360 Creative (Failed - No iframe):';
               
-              // Check if the script loaded at all
+              // Additional debugging
               const dcmScript = document.querySelector('script[src*="dcmads.js"]');
-              if (!dcmScript) {
-                logNetworkActivity('dcmads.js', 'error', 'dcmads.js script not found in DOM');
-              }
+              const dcmElements = document.querySelectorAll('.dcmads');
+              
+              logNetworkActivity('debug', 'error', `dcmads.js script found: ${!!dcmScript}`);
+              logNetworkActivity('debug', 'error', `dcmads elements found: ${dcmElements.length}`);
+              logNetworkActivity('debug', 'error', `Total iframes in document: ${document.querySelectorAll('iframe').length}`);
             }
           };
           

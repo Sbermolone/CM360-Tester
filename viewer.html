@@ -1,4 +1,3 @@
-<!-- viewer.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,26 +5,28 @@
   <title>Tag Viewer</title>
   <style>
     body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
-    iframe { width: 50%; height: 100%; border: none; }
-    #log { width: 50%; height: 100%; padding: 10px; background: #f5f5f5; overflow-y: scroll; border-left: 1px solid #ccc; }
-    .log-entry { font-size: 14px; padding: 5px 0; border-bottom: 1px solid #ddd; }
+    #creative { width: 50%; height: 100%; padding: 10px; border-right: 1px solid #ccc; overflow: auto; }
+    #log { width: 50%; height: 100%; padding: 10px; background: #f5f5f5; overflow-y: auto; }
+    .log-entry { font-size: 14px; padding: 4px 0; border-bottom: 1px solid #ddd; }
+    .timestamp { color: #888; font-size: 12px; margin-right: 6px; }
   </style>
 </head>
 <body>
-  <iframe id="creative"></iframe>
+  <div id="creative"></div>
   <div id="log"></div>
 
   <script>
-    // Extract and decode tag from URL
-    const params = new URLSearchParams(window.location.search);
-    const rawTag = decodeURIComponent(params.get('tag') || '');
+    // Utility: log with timestamp
+    function log(message) {
+      const el = document.createElement('div');
+      el.className = 'log-entry';
+      const time = new Date().toLocaleTimeString();
+      el.innerHTML = `<span class="timestamp">[${time}]</span> ${message}`;
+      document.getElementById('log').appendChild(el);
+      document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+    }
 
-    // Create a blob to isolate the tag inside the iframe
-    const blob = new Blob([rawTag], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    document.getElementById('creative').src = url;
-
-    // Monitor network activity
+    // Hook network activity
     const originalOpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function() {
       log(`XHR: ${arguments[1]}`);
@@ -38,9 +39,9 @@
       return originalFetch.apply(this, arguments);
     };
 
-    const originalImage = Image;
-    window.Image = function() {
-      const img = new originalImage();
+    const OriginalImage = Image;
+    window.Image = function(width, height) {
+      const img = new OriginalImage(width, height);
       Object.defineProperty(img, 'src', {
         set: function(url) {
           log(`Pixel Load: ${url}`);
@@ -50,12 +51,18 @@
       return img;
     };
 
-    function log(message) {
-      const el = document.createElement('div');
-      el.className = 'log-entry';
-      el.textContent = message;
-      document.getElementById('log').appendChild(el);
+    // Grab ?tag= from URL
+    const params = new URLSearchParams(window.location.search);
+    const rawTag = decodeURIComponent(params.get('tag') || '');
+
+    if (rawTag) {
+      document.getElementById('creative').innerHTML = rawTag;
+      log("Tag injected successfully.");
+    } else {
+      document.getElementById('creative').innerText = "No tag provided.";
+      log("No tag found in URL.");
     }
   </script>
 </body>
 </html>
+

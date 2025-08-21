@@ -3,24 +3,129 @@
 <head>
   <meta charset="UTF-8">
   <title>CM360 Tag Tester</title>
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    body { font-family: sans-serif; margin: 20px; }
-    textarea { width: 100%; height: 200px; margin-bottom: 10px; }
-    button { padding: 10px 20px; font-size: 16px; }
+    body { 
+      font-family: 'Segoe UI', sans-serif; 
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #E6F0FA 0%, #F0F6FF 100%);
+      color: #0A1E3F;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      background-color: #ffffff;
+      padding: 40px;
+      border-radius: 15px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      width: 90%;
+      max-width: 600px;
+      border: 2px solid #0055A4;
+    }
+    h1 { 
+      margin-top: 0; 
+      color: #0055A4; 
+      text-align: center;
+      font-weight: 600;
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+    p {
+      text-align: center;
+      font-size: 1.1em;
+      margin-bottom: 30px;
+      color: #0A1E3F;
+    }
+    textarea { 
+      width: 100%; 
+      height: 200px; 
+      margin-bottom: 20px;
+      border: 2px solid #0055A4;
+      border-radius: 8px;
+      padding: 15px;
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 14px;
+      resize: vertical;
+      box-sizing: border-box;
+      background-color: #F0F6FF;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: #007ACC;
+      box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.1);
+    }
+    button { 
+      width: 100%;
+      padding: 15px 20px; 
+      font-size: 18px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #0055A4 0%, #007ACC 100%);
+      color: #fff;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0, 85, 164, 0.3);
+    }
+    button:hover { 
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 85, 164, 0.4);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .note {
+      background-color: #F0F6FF;
+      border: 1px solid #0055A4;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+    .note strong {
+      color: #0055A4;
+    }
   </style>
 </head>
 <body>
-  <h1>CM360 Tag Tester</h1>
-  <p>Paste your CM360 iframe or JS tag below:</p>
-  <textarea id="tagInput"></textarea>
-  <br>
-  <button onclick="runTag()">Run Tag</button>
+  <div class="container">
+    <h1>CM360 Tag Tester</h1>
+    <p>Paste your CM360 iframe or JavaScript tag below to test pixel firing:</p>
+    <textarea id="tagInput" placeholder="Paste your CM360 tag here...
+
+Example:
+<script src='https://www.googletagmanager.com/gtag/js?id=DC-XXXXXXX'></script>
+
+or
+
+<iframe src='https://XXXXXXX.fls.doubleclick.net/...' width='1' height='1' style='display:none'></iframe>"></textarea>
+    <button onclick="runTag()">🚀 Test Tag</button>
+    
+    <div class="note">
+      <strong>Note:</strong> This tool will load your tag and monitor for common tracking pixels including DoubleClick, Meta/Facebook, Google Ads, LiveRamp, and Connect pixels.
+    </div>
+  </div>
 
   <script>
     function runTag() {
-      const tag = encodeURIComponent(document.getElementById('tagInput').value);
+      const tagValue = document.getElementById('tagInput').value.trim();
+      if (!tagValue) {
+        alert('Please enter a tag first!');
+        return;
+      }
+      const tag = encodeURIComponent(tagValue);
       window.location.href = `viewer.html?tag=${tag}`;
     }
+
+    // Allow Enter key to submit (Ctrl+Enter for new line)
+    document.getElementById('tagInput').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.ctrlKey) {
+        e.preventDefault();
+        runTag();
+      }
+    });
   </script>
 </body>
 </html>

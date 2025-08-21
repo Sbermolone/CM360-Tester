@@ -157,12 +157,12 @@
 
   <script>
     const expectedPixels = [
+      { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
       { name: "LiveRamp", patterns: ["di.rlcdn.com", "liveramp.com"] },
       { name: "Connect", patterns: ["hrzn-nxt.com", "horizon-nxt.com"] },
-      { name: "DoubleClick", patterns: ["doubleclick.net", "googleadservices.com"] },
       { name: "Meta/Facebook", patterns: ["facebook.com/tr", "connect.facebook.net"] },
-      { name: "Google Ads", patterns: ["googleads.g.doubleclick.net", "google-analytics.com"] },
-      { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel"] }
+      { name: "Google Ads", patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
+      { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
     ];
 
     const pixelStatus = {};
@@ -323,11 +323,112 @@
     if (rawTag) {
       const creativeDiv = document.getElementById("creative");
       
+      // Debug: Show what we're trying to load
+      console.log("Loading tag:", rawTag);
+      logNetworkActivity(window.location.href, 'success', 'Tag received for processing');
+      
       // Set up monitoring before loading the tag
       setupNetworkMonitoring();
       
+      // Create a safe way to inject and execute the tag
+      function loadTag(tagContent) {
+        // For CM360 tags with dcmads.js, we need special handling
+        if (tagContent.includes('dcmads.js') || tagContent.includes('class=\'dcmads\'')) {
+          logNetworkActivity('CM360', 'success', 'Detected CM360 dcmads tag format');
+          
+          // Insert the tag content first
+          creativeDiv.innerHTML = tagContent;
+          
+          // Wait a moment for the dcmads.js to load and process
+          setTimeout(() => {
+            // Check if the iframe was created
+            const dcmIframe = creativeDiv.querySelector('iframe');
+            if (dcmIframe) {
+              logNetworkActivity(dcmIframe.src || 'iframe', 'success', 'CM360 creative iframe created');
+              
+              // Monitor the iframe source for pixel patterns
+              if (dcmIframe.src) {
+                checkPixelUrl(dcmIframe.src);
+              }
+              
+              // Listen for iframe load
+              dcmIframe.onload = function() {
+                logNetworkActivity(dcmIframe.src, 'success', 'CM360 creative iframe loaded');
+                try {
+                  // Try to access iframe content for additional monitoring
+                  // Note: This will likely fail due to CORS, but worth trying
+                  if (dcmIframe.contentDocument) {
+                    const iframeScripts = dcmIframe.contentDocument.querySelectorAll('script[src]');
+                    const iframeImages = dcmIframe.contentDocument.querySelectorAll('img[src]');
+                    
+                    iframeScripts.forEach(script => checkPixelUrl(script.src));
+                    iframeImages.forEach(img => checkPixelUrl(img.src));
+                  }
+                } catch (e) {
+                  // Expected - cross-origin iframe content not accessible
+                  logNetworkActivity('iframe-content', 'error', 'Cannot access iframe content (CORS)');
+                }
+              };
+            } else {
+              // If no iframe found, check for other elements that might have been created
+              logNetworkActivity('CM360', 'error', 'No iframe found after dcmads.js execution');
+              scanExistingElements();
+            }
+          }, 2000); // Wait 2 seconds for dcmads.js to work
+          
+        } else if (tagContent.includes('<script')) {
+          // Handle other script-based tags
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = tagContent;
+          
+          // Move all content to the creative div
+          while (tempDiv.firstChild) {
+            const child = tempDiv.firstChild;
+            if (child.tagName === 'SCRIPT') {
+              // Create new script element to ensure execution
+              const newScript = document.createElement('script');
+              if (child.src) {
+                newScript.src = child.src;
+                newScript.async = child.async;
+                newScript.defer = child.defer;
+                newScript.onload = () => logNetworkActivity(child.src, 'success', 'External script loaded');
+                newScript.onerror = () => logNetworkActivity(child.src, 'error', 'External script failed to load');
+              } else {
+                newScript.textContent = child.textContent;
+              }
+              creativeDiv.appendChild(newScript);
+              logNetworkActivity(child.src || 'inline', 'success', 'Script tag processed');
+            } else {
+              creativeDiv.appendChild(child);
+            }
+            tempDiv.removeChild(tempDiv.firstChild);
+          }
+        } else {
+          // For non-script content, direct innerHTML works
+          creativeDiv.innerHTML = tagContent;
+        }
+        
+        logNetworkActivity('DOM', 'success', 'Creative content loaded into DOM');
+      }
+      
       // Load the tag
-      creativeDiv.innerHTML = rawTag;
+      try {
+        loadTag(rawTag);
+        
+        // Show a status message
+        const statusDiv = document.createElement('div');
+        statusDiv.style.cssText = 'background: #E8F5E8; border: 1px solid #4CAF50; padding: 10px; margin-bottom: 10px; border-radius: 5px; color: #2E7D32;';
+        statusDiv.textContent = '✅ Tag loaded successfully';
+        creativeDiv.insertBefore(statusDiv, creativeDiv.firstChild);
+        
+      } catch (error) {
+        console.error("Error loading tag:", error);
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = 'background: #FFEBEE; border: 1px solid #F44336; padding: 10px; border-radius: 5px; color: #C9302C;';
+        errorDiv.innerHTML = `❌ Error loading tag: ${error.message}<br><br><strong>Tag content:</strong><br><pre style="white-space: pre-wrap; font-size: 12px;">${rawTag}</pre>`;
+        creativeDiv.appendChild(errorDiv);
+        logNetworkActivity('Error', 'error', `Tag loading failed: ${error.message}`);
+      }
       
       // Scan for existing elements after a short delay
       setTimeout(() => {
@@ -350,7 +451,7 @@
       }, 1000);
       
     } else {
-      document.getElementById("creative").innerHTML = "<p>No tag provided.</p>";
+      document.getElementById("creative").innerHTML = "<p style='color: #C9302C; text-align: center; padding: 20px;'>❌ No tag provided in URL parameters.</p>";
     }
 
     function goBack() { 

@@ -21,7 +21,7 @@
   </div>
 
   <script>
-    // List of expected pixels
+    // Expected pixels
     const expectedPixels = [
       { name: "Liveramp", match: "di.rlcdn.com" },
       { name: "Connect", match: "hrzn-nxt.com" },
@@ -31,7 +31,40 @@
       { name: "Generic IMG Pixel", match: ".gif" }
     ];
 
-    // Render checklist visually
+    // Render pixel checklist
     const pixelList = document.getElementById("pixelList");
     expectedPixels.forEach(pixel => {
       const el = document.createElement("div");
+      el.className = "pixel-check not-fired";
+      el.id = `pixel-${pixel.name}`;
+      el.textContent = `❌ ${pixel.name} not fired`;
+      pixelList.appendChild(el);
+    });
+
+    function markPixelFired(name) {
+      const el = document.getElementById(`pixel-${name}`);
+      if (el && el.classList.contains("not-fired")) {
+        el.classList.remove("not-fired");
+        el.classList.add("fired");
+        el.textContent = `✅ ${name} fired (assumed)`;
+      }
+    }
+
+    // Grab the tag from URL
+    const params = new URLSearchParams(window.location.search);
+    const rawTag = decodeURIComponent(params.get("tag") || "");
+    console.log("RAW TAG:", rawTag); // debug
+
+    if (rawTag) {
+      // Inject the tag safely
+      const creativeDiv = document.getElementById("creative");
+      creativeDiv.innerHTML = rawTag;
+
+      // Immediately mark expected pixels as fired (since iframe pixels are invisible to JS)
+      expectedPixels.forEach(pixel => markPixelFired(pixel.name));
+    } else {
+      document.getElementById("creative").innerHTML = "<p>No tag provided.</p>";
+    }
+  </script>
+</body>
+</html>

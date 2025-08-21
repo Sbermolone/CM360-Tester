@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CM360 Tag Viewer (Pixel Tracker)</title>
+  <title>CM360 Tag Viewer (Visual Pixel Tracker)</title>
   <style>
     body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
     #creative { width: 50%; height: 100%; padding: 10px; border-right: 1px solid #ccc; overflow: auto; }
@@ -21,7 +21,7 @@
   </div>
 
   <script>
-    // List of pixels you care about (add more here)
+    // List of expected pixels
     const expectedPixels = [
       { name: "Liveramp", match: "di.rlcdn.com" },
       { name: "Connect", match: "hrzn-nxt.com" },
@@ -31,67 +31,7 @@
       { name: "Generic IMG Pixel", match: ".gif" }
     ];
 
-    // Render initial checklist
+    // Render checklist visually
     const pixelList = document.getElementById("pixelList");
     expectedPixels.forEach(pixel => {
       const el = document.createElement("div");
-      el.className = "pixel-check not-fired";
-      el.id = `pixel-${pixel.name}`;
-      el.textContent = `❌ ${pixel.name} not fired`;
-      pixelList.appendChild(el);
-    });
-
-    // Helper: mark a pixel as fired
-    function markPixelFired(name, url) {
-      const el = document.getElementById(`pixel-${name}`);
-      if (el && el.classList.contains("not-fired")) {
-        el.classList.remove("not-fired");
-        el.classList.add("fired");
-        el.textContent = `✅ ${name} fired (${url})`;
-      }
-    }
-
-    // Hook network calls
-    function checkPixels(url) {
-      expectedPixels.forEach(pixel => {
-        if (url.includes(pixel.match)) {
-          markPixelFired(pixel.name, url);
-        }
-      });
-    }
-
-    const origOpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function() {
-      checkPixels(arguments[1]);
-      return origOpen.apply(this, arguments);
-    };
-
-    const origFetch = window.fetch;
-    window.fetch = function() {
-      checkPixels(arguments[0]);
-      return origFetch.apply(this, arguments);
-    };
-
-    const OrigImage = Image;
-    window.Image = function(width, height) {
-      const img = new OrigImage(width, height);
-      Object.defineProperty(img, "src", {
-        set: function(url) {
-          checkPixels(url);
-          img.setAttribute("src", url);
-        }
-      });
-      return img;
-    };
-
-    // Inject the creative (inline)
-    const params = new URLSearchParams(window.location.search);
-    const rawTag = decodeURIComponent(params.get("tag") || "");
-    if (rawTag) {
-      document.getElementById("creative").innerHTML = rawTag;
-    } else {
-      document.getElementById("creative").innerHTML = "<p>No tag provided.</p>";
-    }
-  </script>
-</body>
-</html>

@@ -2,18 +2,24 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CM360 Tag Viewer</title>
+  <title>CM360 Tag Viewer (Inline Dynamic)</title>
   <style>
     body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
-    #creativeFrame { width: 50%; height: 100%; border: none; }
-    #log { width: 50%; height: 100%; padding: 10px; background: #f5f5f5; overflow-y: auto; border-left: 1px solid #ccc; }
+    #creative { width: 50%; height: 100%; padding: 10px; border-right: 1px solid #ccc; overflow: auto; }
+    #log { width: 50%; height: 100%; padding: 10px; background: #f5f5f5; overflow-y: auto; }
     .log-entry { font-size: 14px; padding: 4px 0; border-bottom: 1px solid #ddd; }
     .timestamp { color: #888; font-size: 12px; margin-right: 6px; }
+    #controls { position: fixed; top: 10px; right: 10px; }
+    button { padding: 5px 10px; margin-left: 5px; }
   </style>
 </head>
 <body>
-  <iframe id="creativeFrame"></iframe>
+  <div id="creative"></div>
   <div id="log"></div>
+
+  <div id="controls">
+    <button onclick="clearLog()">Clear Log</button>
+  </div>
 
   <script>
     // Logging helper
@@ -26,7 +32,12 @@
       document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
     }
 
-    // Hook requests
+    function clearLog() {
+      document.getElementById('log').innerHTML = '';
+      log('Log cleared.');
+    }
+
+    // Hook network calls
     const origOpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function() {
       log(`XHR: ${arguments[1]}`);
@@ -51,14 +62,14 @@
       return img;
     };
 
-    // Load tag into an iframe (so creative shows properly)
+    // Grab ?tag= from URL
     const params = new URLSearchParams(window.location.search);
     const rawTag = decodeURIComponent(params.get("tag") || "");
+
     if (rawTag) {
-      const blob = new Blob([rawTag], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      document.getElementById("creativeFrame").src = url;
-      log("Creative loaded into iframe.");
+      // Inject tag directly
+      document.getElementById("creative").innerHTML = rawTag;
+      log("Creative injected inline.");
     } else {
       log("No tag provided.");
     }

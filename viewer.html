@@ -2,17 +2,56 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CM360 Tag Viewer (Visual Pixel Tracker)</title>
+  <title>CM360 Tag Viewer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; flex-direction: row; }
-    #leftPanel { width: 50%; height: 100%; padding: 10px; border-right: 1px solid #ccc; overflow: auto; display: flex; flex-direction: column; }
+    body { 
+      font-family: 'Segoe UI', sans-serif; 
+      margin: 0; 
+      display: flex; 
+      height: 100vh; 
+      background-color: #E6F0FA; 
+      color: #0A1E3F;
+    }
+    #leftPanel {
+      width: 50%; 
+      height: 100%; 
+      padding: 15px; 
+      border-right: 1px solid #0055A4; 
+      overflow: auto; 
+      display: flex; 
+      flex-direction: column;
+      background-color: #ffffff;
+      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+      border-radius: 0 10px 10px 0;
+    }
     #creative { flex: 1; }
-    #log { width: 50%; height: 100%; padding: 10px; background: #f5f5f5; overflow-y: auto; }
-    h3 { margin-top: 0; }
+    #log { 
+      width: 50%; 
+      height: 100%; 
+      padding: 20px; 
+      background-color: #F0F6FF; 
+      overflow-y: auto; 
+      border-left: 1px solid #0055A4;
+      border-radius: 10px 0 0 10px;
+    }
+    h3 { margin-top: 0; color: #0055A4; }
     .pixel-check { font-size: 14px; margin: 6px 0; }
-    .fired { color: green; font-weight: bold; }
-    .not-fired { color: red; }
-    #backButton { margin-bottom: 10px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+    .fired { color: #007ACC; font-weight: bold; }
+    .not-fired { color: #C9302C; }
+    #backButton {
+      margin-bottom: 12px; 
+      padding: 10px 20px; 
+      font-size: 14px; 
+      cursor: pointer; 
+      border: none; 
+      border-radius: 6px; 
+      background-color: #0055A4; 
+      color: #fff; 
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    #backButton:hover { background-color: #007ACC; }
   </style>
 </head>
 <body>
@@ -26,7 +65,6 @@
   </div>
 
   <script>
-    // Expected pixels
     const expectedPixels = [
       { name: "Liveramp", match: "di.rlcdn.com" },
       { name: "Connect", match: "hrzn-nxt.com" },
@@ -36,7 +74,6 @@
       { name: "Generic IMG Pixel", match: ".gif" }
     ];
 
-    // Render pixel checklist
     const pixelList = document.getElementById("pixelList");
     expectedPixels.forEach(pixel => {
       const el = document.createElement("div");
@@ -55,26 +92,17 @@
       }
     }
 
-    // Grab the tag from URL
     const params = new URLSearchParams(window.location.search);
     const rawTag = decodeURIComponent(params.get("tag") || "");
-    console.log("RAW TAG:", rawTag); // debug
-
     if (rawTag) {
-      // Inject the tag safely
       const creativeDiv = document.getElementById("creative");
       creativeDiv.innerHTML = rawTag;
-
-      // Immediately mark expected pixels as fired
       expectedPixels.forEach(pixel => markPixelFired(pixel.name));
     } else {
       document.getElementById("creative").innerHTML = "<p>No tag provided.</p>";
     }
 
-    // Back button function
-    function goBack() {
-      window.location.href = "index.html";
-    }
+    function goBack() { window.location.href = "index.html"; }
   </script>
 </body>
 </html>

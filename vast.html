@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>VAST Viewer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#0055A4; --blue2:#007ACC; --bg1:#E6F0FA; --bg2:#F0F6FF; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:'Segoe UI',sans-serif; display:flex; height:100vh;
+           background:linear-gradient(135deg,var(--bg1),var(--bg2)); color:#0A1E3F; }
+    #left { width:50%; padding:15px; border-right:2px solid var(--blue); background:#fff; display:flex; flex-direction:column; }
+    #right { width:50%; padding:20px; background:var(--bg2); overflow:auto; }
+    h3 { margin:0 0 12px; color:var(--blue); }
+    .card { background:#fff; border:1px solid var(--blue); border-radius:10px; padding:12px; margin-bottom:12px; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .btn { padding:8px 12px; border:none; border-radius:8px; color:#fff; background:linear-gradient(135deg,var(--blue),var(--blue2)); font-weight:600; cursor:pointer; }
+    .btn.ghost { background:none; color:var(--blue); border:1px solid var(--blue); }
+    .tiny { font-size:12px; opacity:.85; }
+    video { width:100%; max-height:320px; background:#000; border:1px solid var(--blue); border-radius:10px; }
+    .statbar { display:flex; gap:16px; flex-wrap:wrap; }
+    .statbar span b { font-weight:700; }
+    .pixel-check { font-size:14px; margin:6px 0; padding:6px 10px; border-radius:8px; border-left:4px solid; background:#fff; }
+    .fired { color:#2E7D32; border-left-color:#4CAF50; background:#E8F5E8; font-weight:600; }
+    .not-fired { color:#C9302C; border-left-color:#F44336; background:#FFEBEE; }
+    .pending { color:#FF9800; border-left-color:#FF9800; background:#FFF3E0; }
+    .network-log { max-height:320px; overflow:auto; background:#fff; border:1px solid var(--blue); border-radius:10px; padding:10px; font-family:monospace; font-size:12px; }
+    .network-entry { margin:2px 0; padding:2px 4px; border-radius:4px; }
+    .network-success { background:#E8F5E8; }
+    .network-error { background:#FFEBEE; }
+    .network-pixel { background:#FFF3E0; border:1px solid #FF9800; }
+    a.minilink { color:var(--blue2); text-decoration:none; font-weight:600; }
+  </style>
+</head>
+<body>
+  <div id="left">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <h3>VAST Player</h3>
+        <a class="minilink" href="index.html#vast">← Back</a>
+      </div>
+      <div id="vastInfo" class="tiny"></div>
+      <video id="player" controls playsinline></video>
+      <div class="row" style="margin-top:8px">
+        <button class="btn ghost" onclick="rate(1)">1×</button>
+        <button class="btn ghost" onclick="rate(2)">2×</button>
+        <button class="btn ghost" onclick="rate(4)">4×</button>
+        <button class="btn" onclick="replay()">Replay</button>
+      </div>
+    </div>
+    <div class="card tiny">
+      <b>How it works:</b> This viewer fetches/parses your VAST, follows Wrappers (≤5), picks a playable MP4,
+      and fires Impression/Quartile/Click/Error pings. Your Chrome extension forwards all network requests
+      (incl. subframes) so vendor domains are matched and marked ✅ here.
+    </div>
+  </div>
+
+  <div id="right">
+    <h3>Pixel Tracker</h3>
+    <div class="card statbar">
+      <span>✅ Fired: <b id="firedCount">0</b></span>
+      <span>⏳ Pending: <b id="pendingCount">0</b></span>
+      <span>❌ Not Detected: <b id="notFiredCount">0</b></span>
+    </div>
+    <div id="pixelList" class="card"></div>
+
+    <h3>Network Activity</h3>
+    <div id="networkLog" class="network-log"></div>
+  </div>
+
+  <script>
+    /* ===== Pixel patterns (same list you used in viewer.html) ===== */
+    const expectedPixels = [
+      { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
+      { name: "LiveRamp", patterns: ["di.rlcdn.com", "liveramp.com"] },
+      { name: "Connect", patterns: ["hrzn-nxt.com", "horizon-nxt.com"] },
+      { name: "Meta/Facebook", patterns: ["facebook.com/tr", "connect.facebook.net"] },
+      { name: "Google Ads", patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
+      { name: "DoubleVerify", patterns: ["cdn.doubleverify.com"] },
+      { name: "iSpot", patterns: ["ispot.tv/"] },
+      { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
+    ];
+
+    /* ===== Minimal UI state and helpers ===== */
+    const pixelStatus = {};
+    const networkLog = [];
+    const networkLogEl = document.getElementById('networkLog');
+
+    (function initPixelList(){
+      const list = document.getElementById('pixelList');
+      expectedPixels.forEach(px => {
+        pixelStatus[px.name] = 'not-fired';
+        const el = document.createElement('div');
+        el.className = 'pixel-check not-fired';
+        el.id = 'pixel-' + px.name.replace(/[^a-zA-Z0-9]/g,'');
+        el.textContent = `❌ ${px.name}: Not detected`;
+        list.appendChild(el);
+      });
+      updateStats();
+    })();
+
+    function updateStats(){
+      const vals = Object.values(pixelStatus);
+      firedCount.textContent    = vals.filter(s=>s==='fired').length;
+      pendingCount.textContent  = vals.filter(s=>s==='pending').length;
+      notFiredCount.textContent = vals.filter(s=>s==='not-fired').length;
+    }
+    function markPixelFired(name, url){
+      if (pixelStatus[name] === 'fired') return;
+      pixelStatus[name] = 'fired';
+      const el = document.getElementById('pixel-' + name.replace(/[^a-zA-Z0-9]/g,''));
+      if (el) { el.className = 'pixel-check fired'; el.textContent = `✅ ${name}: Detected`; }
+      logPixelDetection(name, url);
+      updateStats();
+    }
+    function checkPixelUrl(url){
+      if (!url) return;
+      let full="", host="";
+      try { const u = new URL(url, location.href); full = u.href.toLowerCase(); host = u.hostname.toLowerCase(); }
+      catch { full = String(url).toLowerCase(); }
+      expectedPixels.forEach(px => {
+        const hit = px.patterns.some(p => {
+          const pat = (p+'').toLowerCase().trim();
+          if (host && pat.includes('.') && !pat.startsWith('/')) {
+            if (host === pat || host.endsWith('.'+pat)) return true;
+          }
+          return full.includes(pat);
+        });
+        if (hit) markPixelFired(px.name, url);
+      });
+    }
+    function logNetworkActivity(url, status, desc){
+      const ts = new Date().toLocaleTimeString();
+      networkLog.push({ ts, url, status, desc });
+      const row = document.createElement('div');
+      row.className = `network-entry network-${status}`;
+      row.textContent = `[${ts}] ${desc}: ${url}`;
+      networkLogEl.appendChild(row);
+      networkLogEl.scrollTop = networkLogEl.scrollHeight;
+      setTimeout(()=>checkPixelUrl(url),0);
+    }
+    function logPixelDetection(name, url){
+      const ts = new Date().toLocaleTimeString();
+      const row = document.createElement('div');
+      row.className = 'network-entry network-pixel';
+      row.textContent = `[${ts}] 🎯 ${name} PIXEL FIRED: ${url}`;
+      networkLogEl.appendChild(row);
+      networkLogEl.scrollTop = networkLogEl.scrollHeight;
+    }
+
+    /* ===== VAST core: resolve wrappers, pick MediaFile, fire pings ===== */
+    const MAX_HOPS = 5;
+    const state = {
+      impressions: [], tracking: {}, clickThrough: null, clickTracking: [],
+      errorUrls: [], media: null, duration: 0,
+      fired: { imp:false, start:false, q1:false, mid:false, q3:false, complete:false }
+    };
+
+    function t(scope, sel){ const n=scope.querySelector(sel); return n?(n.textContent||'').trim():''; }
+    function ts(scope, sel){ return [...scope.querySelectorAll(sel)].map(n=>(n.textContent||'').trim()).filter(Boolean); }
+    function parseDur(s){ const m=/^(\d+):([0-5]?\d):([0-5]?\d)(?:\.(\d{1,3}))?$/.exec(s||''); if(!m)return 0; return (+m[1])*3600+(+m[2])*60+(+m[3])+((+(m[4]||0))/1000); }
+    function macro(u){ const cb=Math.floor(Math.random()*1e9)+''; const ts=Date.now()+''; return u.replace(/\[CACHEBUSTER\]/gi,cb).replace(/%%CACHEBUSTER%%/gi,cb).replace(/\[TIMESTAMP\]/gi,ts); }
+    function ping(u,label){
+      if (!u) return;
+      const url = macro(u);
+      try { fetch(url,{mode:'no-cors',cache:'no-store',keepalive:true}).catch(()=>{}); } catch(e){}
+      try { const img = new Image(); img.src = url; } catch(e){}
+      logNetworkActivity(url,'success',label||'[Ping]');
+    }
+
+    async function resolveVast(url, depth=0){
+      if (depth > MAX_HOPS) throw new Error('Wrapper limit exceeded');
+      const res = await fetch(url,{mode:'cors',credentials:'omit',cache:'no-store'});
+      const txt = await res.text();
+      const xml = new DOMParser().parseFromString(txt,'application/xml');
+
+      const isWrapper = xml.querySelector('Wrapper');
+      if (isWrapper) {
+        const next = t(xml,'Wrapper > VASTAdTagURI');
+        if (next) {
+          logNetworkActivity(next,'success',`[VAST] Follow wrapper hop ${depth+1}`);
+          const inner = await resolveVast(next, depth+1);
+          return { xml: mergeWrapper(xml, inner.xml) };
+        }
+      }
+      return { xml };
+    }
+    function mergeWrapper(wrapperXML, innerXML){
+      try{
+        const out = innerXML.cloneNode(true);
+        const addTexts = (sel, add) => ([...wrapperXML.querySelectorAll(sel)]
+          .map(n=>n.textContent.trim()).filter(Boolean).forEach(u=>add(out,u)));
+        addTexts('Wrapper > Impression', (doc,u)=>{
+          const inl = doc.querySelector('InLine, Inline') || doc;
+          const where = inl.querySelector('Impressions') || inl;
+          const node = doc.createElement('Impression'); node.textContent=u; where.appendChild(node);
+        });
+        addTexts('Wrapper > Error', (doc,u)=>{
+          const inl = doc.querySelector('InLine, Inline') || doc;
+          const node = doc.createElement('Error'); node.textContent=u; inl.appendChild(node);
+        });
+        [...wrapperXML.querySelectorAll('Wrapper TrackingEvents Tracking')].forEach(tr=>{
+          const inl = out.querySelector('InLine, Inline') || out;
+          const te = inl.querySelector('TrackingEvents') || inl.appendChild(out.createElement('TrackingEvents'));
+          te.appendChild(tr.cloneNode(true));
+        });
+        return out;
+      } catch { return innerXML; }
+    }
+
+    function applyVast(xml){
+      const info = document.getElementById('vastInfo');
+
+      // Collect top-level signals
+      state.impressions = ts(xml,'Impression');
+      state.errorUrls  = ts(xml,'Error');
+
+      // Find a Linear creative
+      const linear = xml.querySelector('InLine Creative Linear, Inline Creative Linear, InLine > Creatives > Creative > Linear, Inline > Creatives > Creative > Linear');
+      if (!linear) { info.innerHTML = '<span style="color:#C9302C">No Linear creative found (VPAID/SIMID not supported here).</span>'; return; }
+
+      // Tracking events
+      state.tracking = {};
+      [...linear.querySelectorAll('TrackingEvents Tracking')].forEach(n=>{
+        const ev=(n.getAttribute('event')||'').trim(); const u=(n.textContent||'').trim(); if (!ev||!u) return;
+        (state.tracking[ev] ||= []).push(u);
+      });
+
+      // Clicks
+      const vc = linear.querySelector('VideoClicks');
+      state.clickThrough = vc ? t(vc,'ClickThrough') : null;
+      state.clickTracking = vc ? ts(vc,'ClickTracking') : [];
+
+      // Media files (mp4 pick, prefer highest bitrate)
+      const files = [...linear.querySelectorAll('MediaFiles MediaFile')].map(n=>({
+        url:(n.textContent||'').trim(),
+        type:(n.getAttribute('type')||'').toLowerCase(),
+        bitrate:+(n.getAttribute('bitrate')||'0')
+      })).filter(x=>x.type.includes('mp4')).sort((a,b)=>b.bitrate-a.bitrate);
+      state.media = files[0] || null;
+      state.duration = parseDur(t(linear,'Duration'));
+
+      if (!state.media) { info.innerHTML = '<span style="color:#C9302C">No playable MP4 MediaFile found.</span>'; return; }
+
+      info.innerHTML = `<div><strong>MediaFile:</strong> ${state.media.url}</div>
+                        <div class="tiny">Impressions: ${state.impressions.length} | Tracking events: ${Object.keys(state.tracking).length} | ClickThrough: ${state.clickThrough ? 'yes' : 'no'}</div>`;
+
+      // Load video and wire tracking
+      const v = document.getElementById('player');
+      v.src = state.media.url; v.currentTime = 0; v.playbackRate = 1;
+      v.onloadedmetadata = () => logNetworkActivity(v.src,'success','[VAST] MediaFile loaded');
+      v.onerror = () => fireError(405); // generic playback error
+
+      wireVideo(v);
+    }
+
+    function wireVideo(v){
+      state.fired = { imp:false, start:false, q1:false, mid:false, q3:false, complete:false };
+
+      // ClickThrough/ClickTracking
+      v.onclick = () => {
+        if (state.clickThrough) {
+          state.clickTracking.forEach(u=>ping(u,'[ClickTracking]'));
+          window.open(state.clickThrough,'_blank','noopener');
+        }
+      };
+
+      v.addEventListener('play', ()=>{
+        if (!state.fired.imp){ state.impressions.forEach(u=>ping(u,'[Impression]')); state.fired.imp=true; }
+        if (!state.fired.start){ fireEvent('start'); state.fired.start=true; }
+      });
+
+      v.addEventListener('timeupdate', ()=>{
+        const d = state.duration || v.duration || 0; if (!d || !isFinite(d)) return;
+        const p = v.currentTime / d;
+        if (!state.fired.q1 && p>=0.25){ fireEvent('firstQuartile'); state.fired.q1=true; }
+        if (!state.fired.mid && p>=0.50){ fireEvent('midpoint'); state.fired.mid=true; }
+        if (!state.fired.q3 && p>=0.75){ fireEvent('thirdQuartile'); state.fired.q3=true; }
+      });
+
+      v.addEventListener('ended', ()=>{ if (!state.fired.complete){ fireEvent('complete'); state.fired.complete=true; } });
+      v.addEventListener('pause', ()=>fireEvent('pause'));
+      v.addEventListener('playing', ()=>fireEvent('resume'));
+      v.addEventListener('volumechange', ()=>{ if (v.muted || v.volume===0) fireEvent('mute'); else fireEvent('unmute'); });
+    }
+
+    function fireEvent(ev){ (state.tracking[ev]||[]).forEach(u=>ping(u,`[Tracking:${ev}]`)); }
+    function fireError(code){ state.errorUrls.forEach(u=>ping(u.replace('[ERRORCODE]', String(code)), `[Error:${code}]`)); }
+    function replay(){ const v=document.getElementById('player'); state.fired={imp:false,start:false,q1:false,mid:false,q3:false,complete:false}; v.currentTime=0; v.play().catch(()=>{}); }
+    function rate(n){ document.getElementById('player').playbackRate = n; }
+
+    /* ===== Boot: read ?vastUrl=… from index.html ===== */
+    (function boot(){
+      const params = new URLSearchParams(location.search);
+      const vastUrl = params.get('vastUrl');
+      if (!vastUrl) { vastInfo.textContent = 'Provide a VAST URL via index.html'; return; }
+      const url = decodeURIComponent(vastUrl);
+      logNetworkActivity(url,'success','[VAST] Fetch VAST URL');
+      resolveVast(url).then(({xml})=>applyVast(xml)).catch(()=>{
+        vastInfo.innerHTML = '<span style="color:#C9302C">Failed to fetch/parse VAST (likely CORS). Add a “Paste XML” flow later if needed.</span>';
+      });
+    })();
+
+    /* ===== Extension bridge: show [Ext] lines & flip pixels on subframe traffic ===== */
+    (function () {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'position:fixed;right:12px;bottom:12px;padding:6px 10px;border-radius:8px;background:#0055A4;color:#fff;font:12px/1.2 sans-serif;z-index:99999;opacity:.9';
+      badge.textContent = 'Pixel Ext: waiting…';
+      document.body.appendChild(badge);
+
+      window.addEventListener('message', (evt) => {
+        const msg = evt.data;
+        if (!msg || msg.source !== 'cm360-pixel-ext') return;
+        if (msg.kind === 'hello') { badge.textContent = 'Pixel Ext: connected'; return; }
+        if (msg.kind === 'net') {
+          const { url, phase, statusCode, method, type, frameId } = msg.payload || {};
+          const status = (phase === 'error' || (statusCode && statusCode >= 400)) ? 'error' : 'success';
+          const desc = `[Ext][${type || 'request'}][f:${frameId}] ${method || ''} ${phase}${statusCode ? ' (' + statusCode + ')' : ''}`;
+          logNetworkActivity(url || '(unknown)', status, desc);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

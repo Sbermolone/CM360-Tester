@@ -103,7 +103,7 @@
     .pending-count { color: #FF9800; }
     .not-fired-count { color: #C9302C; }
     .network-log {
-      max-height: 200px;
+      max-height: 260px;
       overflow-y: auto;
       background-color: #ffffff;
       border: 1px solid #0055A4;
@@ -154,276 +154,378 @@
     <button class="clear-btn" onclick="clearNetworkLog()">Clear Log</button>
     <div id="networkLog" class="network-log"></div>
   </div>
-<script>
-  // --- UI state you already had ---
-  const expectedPixels = [
-    { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
-    { name: "LiveRamp", patterns: ["di.rlcdn.com", "liveramp.com"] },
-    { name: "Connect", patterns: ["hrzn-nxt.com", "horizon-nxt.com"] },
-    { name: "Meta/Facebook", patterns: ["facebook.com/tr", "connect.facebook.net"] },
-    { name: "Google Ads", patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
-    { name: "DoubleVerify", patterns: ["cdn.doubleverify.com"] },
-    { name: "iSpot", patterns: ["ispot.tv/"] },
-    { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
-  ];
 
-  const pixelStatus = {};
-  const networkLog = [];
-  let networkLogElement, pixelListElement;
+  <script>
+    // -----------------------------
+    // Config (kept EXACTLY as you had it)
+    // -----------------------------
+    const expectedPixels = [
+      { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
+      { name: "LiveRamp", patterns: ["di.rlcdn.com", "liveramp.com"] },
+      { name: "Connect", patterns: ["hrzn-nxt.com", "horizon-nxt.com"] },
+      { name: "Meta/Facebook", patterns: ["facebook.com/tr", "connect.facebook.net"] },
+      { name: "Google Ads", patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
+      { name: "DoubleVerify", patterns: ["cdn.doubleverify.com"] },
+      { name: "iSpot", patterns: ["ispot.tv/"] },
+      { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
+    ];
 
-  function initializePixelTracking() {
-    pixelListElement = document.getElementById("pixelList");
-    networkLogElement = document.getElementById("networkLog");
+    // -----------------------------
+    // UI state + helpers
+    // -----------------------------
+    const pixelStatus = {};
+    const networkLog = [];
+    let networkLogElement, pixelListElement;
 
-    expectedPixels.forEach(pixel => {
-      pixelStatus[pixel.name] = 'not-fired';
-      const el = document.createElement("div");
-      el.className = "pixel-check not-fired";
-      el.id = `pixel-${pixel.name.replace(/[^a-zA-Z0-9]/g, '')}`;
-      el.textContent = `❌ ${pixel.name}: Not detected`;
-      pixelListElement.appendChild(el);
-    });
-    updateStats();
-  }
+    function initializePixelTracking() {
+      pixelListElement = document.getElementById("pixelList");
+      networkLogElement = document.getElementById("networkLog");
 
-  function markPixelFired(name, url) {
-    if (pixelStatus[name] !== 'fired') {
-      pixelStatus[name] = 'fired';
-      const el = document.getElementById(`pixel-${name.replace(/[^a-zA-Z0-9]/g, '')}`);
-      if (el) {
-        el.className = "pixel-check fired";
-        el.textContent = `✅ ${name}: Detected`;
-      }
-      logNetworkActivity(url, 'success', `${name} pixel detected`);
-      updateStats();
-    }
-  }
-
-  function markPixelPending(name) {
-    if (pixelStatus[name] === 'not-fired') {
-      pixelStatus[name] = 'pending';
-      const el = document.getElementById(`pixel-${name.replace(/[^a-zA-Z0-9]/g, '')}`);
-      if (el) {
-        el.className = "pixel-check pending";
-        el.textContent = `⏳ ${name}: Loading...`;
-      }
-      updateStats();
-    }
-  }
-
-  function updateStats() {
-    const fired = Object.values(pixelStatus).filter(s => s === 'fired').length;
-    const pending = Object.values(pixelStatus).filter(s => s === 'pending').length;
-    const notFired = Object.values(pixelStatus).filter(s => s === 'not-fired').length;
-
-    document.getElementById('firedCount').textContent = fired;
-    document.getElementById('pendingCount').textContent = pending;
-    document.getElementById('notFiredCount').textContent = notFired;
-  }
-
-  function logNetworkActivity(url, status, description) {
-    const timestamp = new Date().toLocaleTimeString();
-    const entry = { timestamp, url, status, description };
-    networkLog.push(entry);
-
-    const logEntry = document.createElement('div');
-    logEntry.className = `network-entry network-${status}`;
-    logEntry.textContent = `[${timestamp}] ${description}: ${url}`;
-    networkLogElement.appendChild(logEntry);
-    networkLogElement.scrollTop = networkLogElement.scrollHeight;
-
-    // Pattern check -> mark fired
-    checkPixelUrl(url);
-  }
-
-  function clearNetworkLog() {
-    networkLog.length = 0;
-    networkLogElement.innerHTML = '';
-  }
-
-  function checkPixelUrl(url) {
-    expectedPixels.forEach(pixel => {
-      pixel.patterns.forEach(pattern => {
-        if (url.includes(pattern)) {
-          markPixelFired(pixel.name, url);
-        }
-      });
-    });
-  }
-
-  function goBack() {
-    window.location.href = "index.html";
-  }
-  window.goBack = goBack; // keep your button working
-
-  // --- NEW: run tag inside a sandboxed iframe and proxy network events to parent ---
-  function runTagInSandbox(tagContent) {
-    const creativeDiv = document.getElementById("creative");
-
-    // Show debug / raw tag for your UI
-    const debugDiv = document.createElement('div');
-    debugDiv.style.cssText = 'background: #F0F6FF; border: 1px solid #0055A4; padding: 15px; margin-bottom: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 200px; overflow-y: auto;';
-    debugDiv.innerHTML = `<strong>Debug Info:</strong><br><strong>Raw Tag Length:</strong> ${tagContent.length}<br><br><strong>Tag Content:</strong><br>${tagContent}`;
-    creativeDiv.appendChild(debugDiv);
-
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'border: 2px dashed #0055A4; padding: 10px; margin-top: 10px; border-radius: 8px;';
-    wrapper.innerHTML = '<strong>CM360 Creative Sandbox:</strong><br><br>';
-    creativeDiv.appendChild(wrapper);
-
-    const iframe = document.createElement('iframe');
-    // allow-same-origin so inline script can run and patch; remove allow-same-origin if your hosting CSP requires stricter isolation
-    iframe.sandbox = 'allow-scripts allow-same-origin';
-    iframe.style.width = '300px';
-    iframe.style.height = '250px';
-    iframe.style.border = '1px solid #ccc';
-    wrapper.appendChild(iframe);
-
-    // Bootstrap script that runs inside the iframe and proxies network activity to parent
-    const bootstrap = `
-      <script>
-        (function() {
-          function send(kind, url, extra) {
-            try { parent.postMessage({kind, url, extra}, '*'); } catch(e) {}
-          }
-
-        // Patch fetch/XHR/Image only inside iframe
-        const _fetch = window.fetch;
-        window.fetch = function(...args) {
-          const url = (args[0] && args[0].url) ? args[0].url : String(args[0]);
-          send('fetch-init', url, {});
-          return _fetch.apply(this, args).then(r => {
-            send('fetch-done', url, {status: r.status});
-            return r;
-          }).catch(err => {
-            send('fetch-error', url, {message: err && err.message});
-            throw err;
-          });
-        };
-
-        const _XHR = window.XMLHttpRequest;
-        window.XMLHttpRequest = function() {
-          const xhr = new _XHR();
-          const _open = xhr.open;
-          xhr.open = function(method, url, ...rest) {
-            xhr.__mon_url = url;
-            send('xhr-open', url, {method});
-            return _open.apply(this, [method, url, ...rest]);
-          };
-          xhr.addEventListener('load', function() {
-            send('xhr-done', xhr.__mon_url || '', {status: xhr.status});
-          });
-          xhr.addEventListener('error', function() {
-            send('xhr-error', xhr.__mon_url || '', {});
-          });
-          return xhr;
-        };
-
-        const _append = Node.prototype.appendChild;
-        Node.prototype.appendChild = function(child) {
-          try {
-            if (child && child.tagName && child.src) {
-              send('append', child.src, {tag: child.tagName});
-            }
-          } catch(e) {}
-          return _append.call(this, child);
-        };
-
-        const _img = Image;
-        window.Image = function(w, h) {
-          const img = new _img(w, h);
-          const _set = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set;
-          Object.defineProperty(img, 'src', {
-            set(v) { try { send('img-src', v, {}); } catch(e) {} _set.call(this, v); },
-            get() { return HTMLImageElement.prototype.src; }
-          });
-          return img;
-        };
-
-        // If the tag uses document.write, give it a friendly doc that is still "loading"
-        // (We are in srcdoc during initial parse, so document.write works)
-        })();
-      <\/script>
-    `;
-
-    // Compose srcdoc with bootstrap + the user tag
-    iframe.srcdoc = `
-      <!doctype html>
-      <html><head><meta charset="utf-8"></head>
-      <body>
-        ${bootstrap}
-        ${tagContent}
-      </body></html>
-    `;
-
-    iframe.onload = () => {
-      // We can't see inside due to cross-origin loads, but onload means the initial HTML parsed
-      logNetworkActivity('sandbox', 'success', 'Sandbox iframe initialized');
-    };
-
-    iframe.onerror = () => {
-      logNetworkActivity('sandbox', 'error', 'Sandbox iframe failed to initialize');
-      wrapper.style.border = '2px solid #F44336';
-      wrapper.querySelector('strong').textContent = 'CM360 Creative (Iframe Error):';
-    };
-  }
-
-  // Receive network events from sandbox
-  window.addEventListener('message', (evt) => {
-    const d = evt.data || {};
-    if (!d || !d.kind) return;
-    const labelMap = {
-      'fetch-init': 'Fetch request initiated',
-      'fetch-done': 'Fetch request successful',
-      'fetch-error': 'Fetch request error',
-      'xhr-open': 'XHR request initiated',
-      'xhr-done': 'XHR request successful',
-      'xhr-error': 'XHR request error',
-      'append': 'Dynamic element added',
-      'img-src': 'Image src set'
-    };
-    const status = /error/i.test(d.kind) ? 'error' : 'success';
-    logNetworkActivity(d.url || '(unknown)', status, labelMap[d.kind] || d.kind);
-  });
-
-  // --- Boot ---
-  initializePixelTracking();
-
-  const params = new URLSearchParams(window.location.search);
-  const rawTag = decodeURIComponent(params.get("tag") || "");
-
-  // Show simple debug line at top of creative panel
-  const hdr = document.createElement('div');
-  hdr.style.cssText = 'background:#E6F0FA;border:1px solid #0055A4;padding:8px;border-radius:6px;margin-bottom:10px;';
-  hdr.textContent = params.get("tag") ? 'Tag parameter found – loading in sandbox…' : 'No tag parameter provided.';
-  document.getElementById("creative").appendChild(hdr);
-
-  if (rawTag && rawTag.trim()) {
-    // Mark common pixels as "pending" to reflect expected activity
-    expectedPixels.forEach(p => markPixelPending(p.name));
-
-    // Run in sandboxed iframe (fixes your missing-iframe issue)
-    runTagInSandbox(rawTag);
-
-    // Fallback timeout: mark still-pending as not detected after 10s
-    setTimeout(() => {
       expectedPixels.forEach(pixel => {
-        if (pixelStatus[pixel.name] === 'pending') {
-          pixelStatus[pixel.name] = 'not-fired';
-          const el = document.getElementById(`pixel-${pixel.name.replace(/[^a-zA-Z0-9]/g, '')}`);
-          if (el) {
-            el.className = "pixel-check not-fired";
-            el.textContent = `❌ ${pixel.name}: Timeout/Not detected`;
-          }
-        }
+        pixelStatus[pixel.name] = 'not-fired';
+        const el = document.createElement("div");
+        el.className = "pixel-check not-fired";
+        el.id = `pixel-${pixel.name.replace(/[^a-zA-Z0-9]/g, '')}`;
+        el.textContent = `❌ ${pixel.name}: Not detected`;
+        pixelListElement.appendChild(el);
       });
       updateStats();
-    }, 10000);
-  } else {
-    document.getElementById("creative").innerHTML += "<p style='color: #C9302C; text-align: center; padding: 20px;'>❌ No tag content received or tag is empty.</p>";
-  }
-</script>
+    }
 
+    function markPixelFired(name, url) {
+      if (pixelStatus[name] !== 'fired') {
+        pixelStatus[name] = 'fired';
+        const el = document.getElementById(`pixel-${name.replace(/[^a-zA-Z0-9]/g, '')}`);
+        if (el) {
+          el.className = "pixel-check fired";
+          el.textContent = `✅ ${name}: Detected`;
+        }
+        logNetworkActivity(url, 'success', `${name} pixel detected`);
+        updateStats();
+      }
+    }
 
+    function markPixelPending(name) {
+      if (pixelStatus[name] === 'not-fired') {
+        pixelStatus[name] = 'pending';
+        const el = document.getElementById(`pixel-${name.replace(/[^a-zA-Z0-9]/g, '')}`);
+        if (el) {
+          el.className = "pixel-check pending";
+          el.textContent = `⏳ ${name}: Loading...`;
+        }
+        updateStats();
+      }
+    }
+
+    function updateStats() {
+      const fired = Object.values(pixelStatus).filter(s => s === 'fired').length;
+      const pending = Object.values(pixelStatus).filter(s => s === 'pending').length;
+      const notFired = Object.values(pixelStatus).filter(s => s === 'not-fired').length;
+
+      document.getElementById('firedCount').textContent = fired;
+      document.getElementById('pendingCount').textContent = pending;
+      document.getElementById('notFiredCount').textContent = notFired;
+    }
+
+    function logNetworkActivity(url, status, description) {
+      const timestamp = new Date().toLocaleTimeString();
+      const entry = { timestamp, url, status, description };
+      networkLog.push(entry);
+
+      const logEntry = document.createElement('div');
+      logEntry.className = `network-entry network-${status}`;
+      logEntry.textContent = `[${timestamp}] ${description}: ${url}`;
+      networkLogElement.appendChild(logEntry);
+      networkLogElement.scrollTop = networkLogElement.scrollHeight;
+
+      // Pattern check -> mark fired
+      checkPixelUrl(url);
+    }
+
+    function clearNetworkLog() {
+      networkLog.length = 0;
+      networkLogElement.innerHTML = '';
+    }
+
+    // -----------------------------
+    // Smarter, case-insensitive, hostname-aware matching
+    // (no changes to expectedPixels needed)
+    // -----------------------------
+    function checkPixelUrl(url) {
+      if (!url) return;
+
+      let full = "";
+      let host = "";
+      try {
+        const u = new URL(String(url), window.location.href);
+        full = u.href.toLowerCase();
+        host = u.hostname.toLowerCase();
+      } catch {
+        full = String(url).toLowerCase();
+      }
+
+      expectedPixels.forEach(pixel => {
+        const hit = pixel.patterns.some(pat => {
+          const p = String(pat).toLowerCase().trim();
+
+          // If pattern looks like a domain, match by hostname (covers subdomains)
+          if (p.includes(".") && !p.startsWith("/") && host) {
+            if (host === p || host.endsWith("." + p)) return true;
+          }
+          // Fallback substring match on the full URL (for paths / generic patterns)
+          return full.includes(p);
+        });
+
+        if (hit) markPixelFired(pixel.name, url);
+      });
+    }
+
+    function goBack() { window.location.href = "index.html"; }
+    window.goBack = goBack; // keep your button working
+
+    // -----------------------------
+    // Sandbox runner: inject tag into srcdoc iframe with deep instrumentation
+    // -----------------------------
+    function runTagInSandbox(tagContent) {
+      const creativeDiv = document.getElementById("creative");
+
+      // Debug panel (safe-escaped)
+      const debugDiv = document.createElement('div');
+      debugDiv.style.cssText = 'background: #F0F6FF; border: 1px solid #0055A4; padding: 15px; margin-bottom: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 220px; overflow-y: auto;';
+      const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      debugDiv.innerHTML = `<strong>Debug Info:</strong><br><strong>Raw Tag Length:</strong> ${tagContent.length}<br><br><strong>Tag Content (escaped):</strong><br><code>${esc(tagContent)}</code>`;
+      creativeDiv.appendChild(debugDiv);
+
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'border: 2px dashed #0055A4; padding: 10px; margin-top: 10px; border-radius: 8px;';
+      wrapper.innerHTML = '<strong>CM360 Creative Sandbox:</strong><br><br>';
+      creativeDiv.appendChild(wrapper);
+
+      const iframe = document.createElement('iframe');
+      iframe.sandbox = 'allow-scripts allow-same-origin';
+      iframe.style.width = '300px';
+      iframe.style.height = '250px';
+      iframe.style.border = '1px solid #ccc';
+      wrapper.appendChild(iframe);
+
+      // Bootstrap script that runs inside the iframe and proxies network activity to the parent
+      const bootstrap = `
+        <script>
+          (function() {
+            function send(kind, url, extra) {
+              try { parent.postMessage({kind, url, extra}, '*'); } catch (e) {}
+            }
+
+            // ---- Patch fetch / XHR ----
+            const _fetch = window.fetch;
+            window.fetch = function(...args) {
+              const url = (args[0] && args[0].url) ? args[0].url : String(args[0]);
+              send('fetch-init', url, {});
+              return _fetch.apply(this, args).then(r => {
+                send('fetch-done', url, {status: r.status});
+                return r;
+              }).catch(err => {
+                send('fetch-error', url, {message: err && err.message});
+                throw err;
+              });
+            };
+
+            const _XHR = window.XMLHttpRequest;
+            window.XMLHttpRequest = function() {
+              const xhr = new _XHR();
+              const _open = xhr.open;
+              xhr.open = function(method, url, ...rest) {
+                xhr.__mon_url = url;
+                send('xhr-open', url, {method});
+                return _open.apply(this, [method, url, ...rest]);
+              };
+              xhr.addEventListener('load', function() {
+                send('xhr-done', xhr.__mon_url || '', {status: xhr.status});
+              });
+              xhr.addEventListener('error', function() {
+                send('xhr-error', xhr.__mon_url || '', {});
+              });
+              return xhr;
+            };
+
+            // ---- Patch element insertions ----
+            const _append = Node.prototype.appendChild;
+            Node.prototype.appendChild = function(child) {
+              try {
+                if (child && child.tagName) {
+                  const u = child.src || child.href || '';
+                  if (u) send('dom-append', u, {tag: child.tagName});
+                }
+              } catch (e) {}
+              return _append.call(this, child);
+            };
+
+            // ---- Patch setters for late src/href assignments ----
+            try {
+              const dImg = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+              Object.defineProperty(HTMLImageElement.prototype, 'src', {
+                set(v){ try { send('img-src', String(v), {}); } catch(e){} return dImg.set.call(this, v); },
+                get(){ return dImg.get.call(this); }
+              });
+            } catch(e){}
+
+            try {
+              const dIf = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'src');
+              Object.defineProperty(HTMLIFrameElement.prototype, 'src', {
+                set(v){ try { send('iframe-src', String(v), {}); } catch(e){} return dIf.set.call(this, v); },
+                get(){ return dIf.get.call(this); }
+              });
+            } catch(e){}
+
+            try {
+              const dSc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+              Object.defineProperty(HTMLScriptElement.prototype, 'src', {
+                set(v){ try { send('script-src', String(v), {}); } catch(e){} return dSc.set.call(this, v); },
+                get(){ return dSc.get.call(this); }
+              });
+            } catch(e){}
+
+            try {
+              const dLk = Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype, 'href');
+              Object.defineProperty(HTMLLinkElement.prototype, 'href', {
+                set(v){ try { send('link-href', String(v), {}); } catch(e){} return dLk.set.call(this, v); },
+                get(){ return dLk.get.call(this); }
+              });
+            } catch(e){}
+
+            // ---- MutationObserver: catches document.write/innerHTML insertions & late src/href changes ----
+            try {
+              const mo = new MutationObserver((mutations) => {
+                mutations.forEach(m => {
+                  if (m.type === 'attributes') {
+                    const n = m.target;
+                    const url = n.src || n.href || '';
+                    if (url) send('attr-change', url, {tag: n.tagName, attr: m.attributeName});
+                  }
+                  (m.addedNodes || []).forEach(n => {
+                    if (n && n.tagName) {
+                      const url = n.src || n.href || '';
+                      if (url) send('dom-add', url, {tag: n.tagName});
+                    }
+                  });
+                });
+              });
+              mo.observe(document.documentElement, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['src','href']
+              });
+            } catch(e) {
+              send('mo-error', '', {message: e.message});
+            }
+
+            // ---- PerformanceObserver: resource-level visibility ----
+            try {
+              if ('PerformanceObserver' in window) {
+                const po = new PerformanceObserver((list) => {
+                  list.getEntries().forEach((e) => {
+                    if (e && e.name) {
+                      send('perf-entry', e.name, {type: e.initiatorType});
+                    }
+                  });
+                });
+                po.observe({ entryTypes: ['resource'] });
+              }
+            } catch(e) {
+              send('perf-error', '', {message: e.message});
+            }
+
+            // Ready
+            send('bootstrap-ready', location.href, {});
+          })();
+        <\/script>
+      `;
+
+      // Compose srcdoc: bootstrap first, then user tag (document is still "parsing" so document.write works)
+      iframe.srcdoc = `
+        <!doctype html>
+        <html><head><meta charset="utf-8"></head>
+        <body>
+          ${bootstrap}
+          ${tagContent}
+        </body></html>
+      `;
+
+      iframe.onload = () => {
+        logNetworkActivity('sandbox', 'success', 'Sandbox iframe initialized');
+      };
+      iframe.onerror = () => {
+        logNetworkActivity('sandbox', 'error', 'Sandbox iframe failed to initialize');
+        wrapper.style.border = '2px solid #F44336';
+        wrapper.querySelector('strong').textContent = 'CM360 Creative (Iframe Error):';
+      };
+    }
+
+    // -----------------------------
+    // Receive sandbox events in parent (and feed into detector)
+    // -----------------------------
+    window.addEventListener('message', (evt) => {
+      const d = evt.data || {};
+      if (!d || !d.kind) return;
+      const labelMap = {
+        'fetch-init': 'Fetch request initiated',
+        'fetch-done': 'Fetch request successful',
+        'fetch-error': 'Fetch request error',
+        'xhr-open': 'XHR request initiated',
+        'xhr-done': 'XHR request successful',
+        'xhr-error': 'XHR request error',
+        'dom-append': 'Dynamic element appended',
+        'img-src': 'Image src set',
+        'iframe-src': 'Iframe src set',
+        'script-src': 'Script src set',
+        'link-href': 'Link href set',
+        'attr-change': 'Attribute changed',
+        'dom-add': 'DOM node added',
+        'perf-entry': 'Resource loaded',
+        'mo-error': 'Mutation observer error',
+        'perf-error': 'Perf observer error',
+        'bootstrap-ready': 'Sandbox ready'
+      };
+      const status = /error/i.test(d.kind) ? 'error' : 'success';
+      logNetworkActivity(d.url || '(unknown)', status, labelMap[d.kind] || d.kind);
+    });
+
+    // -----------------------------
+    // Boot
+    // -----------------------------
+    initializePixelTracking();
+
+    const params = new URLSearchParams(window.location.search);
+    const rawTag = decodeURIComponent(params.get("tag") || "");
+
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'background:#E6F0FA;border:1px solid #0055A4;padding:8px;border-radius:6px;margin-bottom:10px;';
+    hdr.textContent = params.get("tag") ? 'Tag parameter found – loading in sandbox…' : 'No tag parameter provided.';
+    document.getElementById("creative").appendChild(hdr);
+
+    if (rawTag && rawTag.trim()) {
+      // Mark all as pending initially
+      expectedPixels.forEach(p => markPixelPending(p.name));
+      runTagInSandbox(rawTag);
+
+      // Fallback timeout: mark still-pending as not detected after 10s
+      setTimeout(() => {
+        expectedPixels.forEach(pixel => {
+          if (pixelStatus[pixel.name] === 'pending') {
+            pixelStatus[pixel.name] = 'not-fired';
+            const el = document.getElementById(`pixel-${pixel.name.replace(/[^a-zA-Z0-9]/g, '')}`);
+            if (el) {
+              el.className = "pixel-check not-fired";
+              el.textContent = `❌ ${pixel.name}: Timeout/Not detected`;
+            }
+          }
+        });
+        updateStats();
+      }, 10000);
+    } else {
+      document.getElementById("creative").innerHTML += "<p style='color: #C9302C; text-align: center; padding: 20px;'>❌ No tag content received or tag is empty.</p>";
+    }
+  </script>
 </body>
 </html>

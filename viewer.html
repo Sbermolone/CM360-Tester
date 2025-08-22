@@ -425,6 +425,32 @@
       const status = /error/i.test(d.kind) ? 'error' : 'success';
       logNetworkActivity(d.url || '(unknown)', status, `[Sandbox] ${labelMap[d.kind] || d.kind}`);
     });
+// === Extension bridge: receive network events across subframes ===
+(function () {
+  // Optional: small badge so you see when the extension is connected
+  const badge = document.createElement('div');
+  badge.style.cssText = 'position:fixed;right:12px;bottom:12px;padding:6px 10px;border-radius:6px;background:#0055A4;color:#fff;font:12px/1.2 sans-serif;z-index:99999;opacity:.9';
+  badge.textContent = 'Pixel Ext: waiting…';
+  document.body.appendChild(badge);
+
+  window.addEventListener('message', (evt) => {
+    const msg = evt.data;
+    if (!msg || msg.source !== 'cm360-pixel-ext') return;
+
+    if (msg.kind === 'hello') {
+      badge.textContent = 'Pixel Ext: connected';
+      return;
+    }
+
+    if (msg.kind === 'net') {
+      // Normalize into your existing logger/detector
+      const { url, phase, statusCode, method, type, frameId } = msg.payload || {};
+      const status = (phase === 'error' || (statusCode && statusCode >= 400)) ? 'error' : 'success';
+      const desc = `[Ext][${type || 'request'}][f:${frameId}] ${method || ''} ${phase}${statusCode ? ' (' + statusCode + ')' : ''}`;
+      logNetworkActivity(url || '(unknown)', status, desc);
+    }
+  });
+})();
 
     // ---- Boot ----
     initializePixelTracking();

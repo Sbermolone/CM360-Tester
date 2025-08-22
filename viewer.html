@@ -6,25 +6,25 @@
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; background: linear-gradient(135deg, #E6F0FA 0%, #F0F6FF 100%); color: #0A1E3F; }
-    #leftPanel { width: 50%; height: 100%; padding: 15px; border-right: 2px solid #0055A4; overflow: auto; display: flex; flex-direction: column; background-color: #ffffff; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
+    #leftPanel { width: 50%; height: 100%; padding: 15px; border-right: 2px solid #0055A4; overflow: auto; display: flex; flex-direction: column; background-color: #fff; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
     #creative { flex: 1; border: 1px solid #0055A4; border-radius: 8px; padding: 10px; background-color: #F0F6FF; overflow: auto; }
     #log { width: 50%; height: 100%; padding: 20px; background-color: #F0F6FF; overflow-y: auto; }
     h3 { margin-top: 0; color: #0055A4; font-weight: 600; font-size: 1.4em; margin-bottom: 20px; }
-    .pixel-check { font-size: 14px; margin: 8px 0; padding: 8px 12px; border-radius: 6px; border-left: 4px solid; background-color: #ffffff; }
+    .pixel-check { font-size: 14px; margin: 8px 0; padding: 8px 12px; border-radius: 6px; border-left: 4px solid; background-color: #fff; }
     .fired { color: #2E7D32; font-weight: 600; border-left-color: #4CAF50; background-color: #E8F5E8; }
     .not-fired { color: #C9302C; border-left-color: #F44336; background-color: #FFEBEE; }
     .pending { color: #FF9800; border-left-color: #FF9800; background-color: #FFF3E0; }
-    #backButton { margin-bottom: 12px; padding: 12px 24px; font-size: 14px; cursor: pointer; border: none; border-radius: 8px; background: linear-gradient(135deg, #0055A4 0%, #007ACC 100%); color: #fff; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 85, 164, 0.3); }
-    #backButton:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 85, 164, 0.4); }
-    .stats { background-color: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #0055A4; }
+    #backButton { margin-bottom: 12px; padding: 12px 24px; font-size: 14px; cursor: pointer; border: none; border-radius: 8px; background: linear-gradient(135deg, #0055A4 0%, #007ACC 100%); color: #fff; font-weight: 600; transition: all .3s ease; box-shadow: 0 2px 8px rgba(0,85,164,.3); }
+    #backButton:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,85,164,.4); }
+    .stats { background-color: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #0055A4; }
     .stats-item { display: inline-block; margin-right: 20px; font-weight: 600; }
     .fired-count { color: #2E7D32; } .pending-count { color: #FF9800; } .not-fired-count { color: #C9302C; }
-    .network-log { max-height: 260px; overflow-y: auto; background-color: #ffffff; border: 1px solid #0055A4; border-radius: 8px; padding: 10px; margin-top: 20px; font-family: monospace; font-size: 12px; }
+    .network-log { max-height: 260px; overflow-y: auto; background-color: #fff; border: 1px solid #0055A4; border-radius: 8px; padding: 10px; margin-top: 20px; font-family: monospace; font-size: 12px; }
     .network-entry { margin: 2px 0; padding: 2px 4px; border-radius: 3px; }
     .network-success { background-color: #E8F5E8; } .network-error { background-color: #FFEBEE; }
     .network-pixel { background-color: #FFF3E0; border: 1px solid #FF9800; }
     .clear-btn { background: none; border: 1px solid #0055A4; color: #0055A4; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-top: 10px; }
-    .clear-btn:hover { background-color: #0055A4; color: white; }
+    .clear-btn:hover { background-color: #0055A4; color: #fff; }
   </style>
 </head>
 <body>
@@ -47,18 +47,19 @@
   </div>
 
   <script>
-    // Keep your vendor list as in your file
+    // ---- Keep your vendor patterns EXACTLY as provided ----
     const expectedPixels = [
       { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
-      { name: "LiveRamp", patterns: ["rlcdn.com", "liveramp.com", "ats-sb.lp4.io", "ramp.com"] },
+      { name: "LiveRamp", patterns: ["di.rlcdn.com", "liveramp.com"] },
       { name: "Connect", patterns: ["hrzn-nxt.com", "horizon-nxt.com"] },
       { name: "Meta/Facebook", patterns: ["facebook.com/tr", "connect.facebook.net"] },
       { name: "Google Ads", patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
-      { name: "DoubleVerify", patterns: ["doubleverify.com", "dvtps.com", "adsafeprotected.com"] },
-      { name: "iSpot", patterns: ["ispot.tv", "px.ispot.tv"] },
+      { name: "DoubleVerify", patterns: ["cdn.doubleverify.com"] },
+      { name: "iSpot", patterns: ["ispot.tv/"] },
       { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
     ];
 
+    // ---- UI state + helpers ----
     const pixelStatus = {};
     const networkLog = [];
     let networkLogElement, pixelListElement;
@@ -111,7 +112,8 @@
       logEntry.textContent = `[${timestamp}] ${description}: ${url}`;
       networkLogElement.appendChild(logEntry);
       networkLogElement.scrollTop = networkLogElement.scrollHeight;
-      setTimeout(() => checkPixelUrl(url), 0); // detect after logging
+      // detect after logging
+      setTimeout(() => checkPixelUrl(url), 0);
     }
 
     function logPixelDetection(name, url) {
@@ -126,7 +128,7 @@
 
     function clearNetworkLog() { networkLog.length = 0; networkLogElement.innerHTML = ''; }
 
-    // Hostname-aware, case-insensitive matching (no vendor list changes needed)
+    // ---- Smarter matching: hostname-aware + case-insensitive ----
     function checkPixelUrl(url) {
       if (!url || typeof url !== 'string') return;
       let full = "", host = "";
@@ -138,10 +140,10 @@
       expectedPixels.forEach(pixel => {
         const hit = pixel.patterns.some(pat => {
           const p = String(pat).toLowerCase().trim();
-          if (p.includes(".") && !p.startsWith("/") && host) { // domain-like
+          if (p.includes(".") && !p.startsWith("/") && host) { // domain-like pattern
             if (host === p || host.endsWith("." + p)) return true;
           }
-          return full.includes(p); // fallback substring
+          return full.includes(p); // path/substring fallback
         });
         if (hit) markPixelFired(pixel.name, url);
       });
@@ -150,7 +152,123 @@
     function goBack() { window.location.href = "index.html"; }
     window.goBack = goBack;
 
-    // Run tag inside a sandboxed iframe with deep instrumentation
+    // ---- Child-iframe instrumentation (about:blank -> same-origin) ----
+    // Minimal hooks we inject into about:blank subframes to report network-relevant events.
+    const CHILD_HOOKS_JS = `
+      (function(){
+        function send(kind, url, extra){ try{ parent.postMessage({kind, url, extra}, '*'); }catch(e){} }
+
+        // fetch
+        const _fetch = window.fetch;
+        window.fetch = function(...args){
+          const u = (args[0] && args[0].url) ? args[0].url : String(args[0]);
+          send('fetch-init', u, {});
+          return _fetch.apply(this, args).then(r => { send('fetch-done', u, {status:r.status}); return r; })
+                                         .catch(err => { send('fetch-error', u, {message:err && err.message}); throw err; });
+        };
+
+        // XHR
+        const _XHR = window.XMLHttpRequest;
+        window.XMLHttpRequest = function(){
+          const xhr = new _XHR(); const _open = xhr.open;
+          xhr.open = function(method, url, ...rest){ xhr.__u = url; send('xhr-open', url, {method}); return _open.apply(this, [method,url,...rest]); };
+          xhr.addEventListener('load',  ()=>send('xhr-done',  xhr.__u||'', {status:xhr.status}));
+          xhr.addEventListener('error', ()=>send('xhr-error', xhr.__u||'', {}));
+          return xhr;
+        };
+
+        // sendBeacon
+        if (navigator && navigator.sendBeacon){
+          const _beacon = navigator.sendBeacon.bind(navigator);
+          navigator.sendBeacon = function(url, data){ send('beacon', String(url||''), {}); return _beacon(url, data); };
+        }
+
+        // appendChild + setAttribute for src/href
+        const _append = Node.prototype.appendChild;
+        Node.prototype.appendChild = function(ch){
+          try{ if(ch && ch.tagName){ const u = ch.src || ch.href || ''; if(u) send('dom-append', u, {tag: ch.tagName}); } }catch(e){}
+          return _append.call(this, ch);
+        };
+
+        const _setAttr = Element.prototype.setAttribute;
+        Element.prototype.setAttribute = function(name, value){
+          try{ if((name==='src'||name==='href') && value){ send('attr-set', String(value), {tag:this.tagName, attr:name}); } }catch(e){}
+          return _setAttr.apply(this, arguments);
+        };
+
+        // property setters
+        try{ const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLImageElement.prototype,'src',{set(v){send('img-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
+        try{ const d=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLIFrameElement.prototype,'src',{set(v){send('iframe-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
+        try{ const d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLScriptElement.prototype,'src',{set(v){send('script-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
+        try{ const d=Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype,'href'); if(d&&d.set) Object.defineProperty(HTMLLinkElement.prototype,'href',{set(v){send('link-href',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
+
+        // document.write URL sniff
+        const _write = document.write.bind(document), _writeln = document.writeln.bind(document);
+        function sniff(args){ try{ const s = Array.from(args).join(''); (s.match(/https?:\\/\\/[^"'>\\s)]+/gi)||[]).forEach(u=>send('doc-url',u,{})); }catch(e){} }
+        document.write = function(){ sniff(arguments); return _write.apply(document, arguments); };
+        document.writeln = function(){ sniff(arguments); return _writeln.apply(document, arguments); };
+
+        // Observe added nodes and src/href changes
+        try{
+          const mo = new MutationObserver(muts=>{
+            muts.forEach(m=>{
+              if(m.type==='attributes' && (m.attributeName==='src'||m.attributeName==='href')){
+                const n=m.target; const u=n.src||n.href||''; if(u) send('attr-change', u, {tag:n.tagName, attr:m.attributeName});
+              }
+              (m.addedNodes||[]).forEach(n=>{
+                if(n && n.tagName){
+                  const u=n.src||n.href||''; if(u) send('dom-add', u, {tag:n.tagName});
+                  if(n.querySelectorAll){ n.querySelectorAll('[src],[href]').forEach(nn=>{ const uu=nn.src||nn.href||''; if(uu) send('nested-element', uu, {tag:nn.tagName}); }); }
+                }
+              });
+            });
+          });
+          mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src','href']});
+        }catch(e){ send('mo-error','',{message:e.message}); }
+
+        // Performance entries for resources in this frame
+        try{
+          if('PerformanceObserver' in window){
+            const po=new PerformanceObserver(list=>{ list.getEntries().forEach(ent=>{ if(ent && ent.name) send('perf-entry', ent.name, {type:ent.initiatorType}); });});
+            po.observe({entryTypes:['resource']});
+          }
+        }catch(e){ send('perf-error','',{message:e.message}); }
+
+        send('child-hooks-ready', location.href, {});
+      })();
+    `;
+
+    function instrumentAboutBlankIframe(node) {
+      try {
+        if (!node || node.tagName !== 'IFRAME') return;
+        const src = (node.getAttribute('src') || '').trim();
+        // Treat empty src / about:blank / data: as instrumentable
+        if (!src || src === 'about:blank' || src.startsWith('javascript:') || src.startsWith('data:')) {
+          // Wait for the contentDocument to exist, then inject our hooks
+          let tries = 0;
+          (function attempt(){
+            tries++;
+            try {
+              const doc = node.contentDocument || (node.contentWindow && node.contentWindow.document);
+              if (doc && doc.documentElement) {
+                const s = doc.createElement('script');
+                s.textContent = CHILD_HOOKS_JS;
+                doc.documentElement.appendChild(s);
+                logNetworkActivity('(child-frame)', 'success', 'Injected child iframe hooks');
+                return;
+              }
+            } catch(e) {
+              // If navigation already occurred, we won't be able to inject
+            }
+            if (tries < 40) setTimeout(attempt, 50); // up to ~2s
+          })();
+        }
+      } catch(e) {
+        logNetworkActivity('(child-frame)', 'error', 'Failed to inject child hooks: ' + e.message);
+      }
+    }
+
+    // ---- Main sandbox runner ----
     function runTagInSandbox(tagContent) {
       const creativeDiv = document.getElementById("creative");
 
@@ -171,105 +289,92 @@
       iframe.style.width = '300px'; iframe.style.height = '250px'; iframe.style.border = '1px solid #ccc';
       wrapper.appendChild(iframe);
 
-      // Bootstrap that runs inside the iframe and reports back
-      const bootstrap = `
+      // Bootstrap that runs inside the sandbox frame
+      const BOOTSTRAP = `
         <script>
-          (function() {
-            function send(kind, url, extra) { try { parent.postMessage({kind, url, extra}, '*'); } catch(e) {} }
+          (function(){
+            function send(kind, url, extra){ try{ parent.postMessage({kind, url, extra}, '*'); }catch(e){} }
 
             // fetch
             const _fetch = window.fetch;
-            window.fetch = function(...args) {
-              const url = (args[0] && args[0].url) ? args[0].url : String(args[0]);
-              send('fetch-init', url, {});
-              return _fetch.apply(this, args).then(r => { send('fetch-done', url, {status:r.status}); return r; })
-                                           .catch(err => { send('fetch-error', url, {message:err && err.message}); throw err; });
+            window.fetch = function(...args){
+              const u = (args[0] && args[0].url) ? args[0].url : String(args[0]);
+              send('fetch-init', u, {}); 
+              return _fetch.apply(this, args).then(r=>{ send('fetch-done', u, {status:r.status}); return r; })
+                                             .catch(err=>{ send('fetch-error', u, {message:err && err.message}); throw err; });
             };
 
             // XHR
             const _XHR = window.XMLHttpRequest;
-            window.XMLHttpRequest = function() {
+            window.XMLHttpRequest = function(){
               const xhr = new _XHR(); const _open = xhr.open;
-              xhr.open = function(method, url, ...rest) { xhr.__mon_url = url; send('xhr-open', url, {method}); return _open.apply(this, [method, url, ...rest]); };
-              xhr.addEventListener('load',  () => send('xhr-done',  xhr.__mon_url || '', {status:xhr.status}));
-              xhr.addEventListener('error', () => send('xhr-error', xhr.__mon_url || '', {}));
+              xhr.open = function(method, url, ...rest){ xhr.__u=url; send('xhr-open', url, {method}); return _open.apply(this,[method,url,...rest]); };
+              xhr.addEventListener('load', ()=>send('xhr-done', xhr.__u||'', {status:xhr.status}));
+              xhr.addEventListener('error',()=>send('xhr-error',xhr.__u||'',{}));
               return xhr;
             };
 
-            // sendBeacon (used by some vendors)
-            if (navigator && navigator.sendBeacon) {
-              const _beacon = navigator.sendBeacon.bind(navigator);
-              navigator.sendBeacon = function(url, data) { send('beacon', String(url||''), {}); return _beacon(url, data); };
+            // sendBeacon
+            if (navigator && navigator.sendBeacon){
+              const _b = navigator.sendBeacon.bind(navigator);
+              navigator.sendBeacon = function(url, data){ send('beacon', String(url||''), {}); return _b(url, data); };
             }
 
-            // appendChild
+            // appendChild: also try to instrument about:blank child iframes we create inside this frame
             const _append = Node.prototype.appendChild;
-            Node.prototype.appendChild = function(child) {
-              try { if (child && child.tagName) { const u = child.src || child.href || ''; if (u) send('dom-append', u, {tag: child.tagName}); } } catch(e){}
-              return _append.call(this, child);
-            };
-
-            // setAttribute for src/href
-            const _setAttr = Element.prototype.setAttribute;
-            Element.prototype.setAttribute = function(name, value) {
-              try { if ((name === 'src' || name === 'href') && value) { send('attr-set', String(value), {tag:this.tagName, attr:name}); } } catch(e){}
-              return _setAttr.apply(this, arguments);
-            };
-
-            // property setters (img/src, iframe/src, script/src, link/href)
-            try {
-              const dImg = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
-              if (dImg && dImg.set) Object.defineProperty(HTMLImageElement.prototype, 'src', { set(v){ send('img-src', String(v), {}); return dImg.set.call(this, v); }, get(){ return dImg.get.call(this); } });
-            } catch(e){}
-            try {
-              const dIf = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'src');
-              if (dIf && dIf.set) Object.defineProperty(HTMLIFrameElement.prototype, 'src', { set(v){ send('iframe-src', String(v), {}); return dIf.set.call(this, v); }, get(){ return dIf.get.call(this); } });
-            } catch(e){}
-            try {
-              const dSc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
-              if (dSc && dSc.set) Object.defineProperty(HTMLScriptElement.prototype, 'src', { set(v){ send('script-src', String(v), {}); return dSc.set.call(this, v); }, get(){ return dSc.get.call(this); } });
-            } catch(e){}
-            try {
-              const dLk = Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype, 'href');
-              if (dLk && dLk.set) Object.defineProperty(HTMLLinkElement.prototype, 'href', { set(v){ send('link-href', String(v), {}); return dLk.set.call(this, v); }, get(){ return dLk.get.call(this); } });
-            } catch(e){}
-
-            // document.write / writeln (log embedded URLs)
-            const _write = document.write.bind(document);
-            const _writeln = document.writeln.bind(document);
-            function logStrings(args){ try { const s = Array.from(args).join(''); const urls = s.match(/https?:\\/\\/[^"'>\\s)]+/gi) || []; urls.forEach(u => send('doc-url', u, {})); } catch(e){} }
-            document.write = function(){ logStrings(arguments); return _write.apply(document, arguments); };
-            document.writeln = function(){ logStrings(arguments); return _writeln.apply(document, arguments); };
-
-            // MutationObserver (added nodes + src/href changes)
-            try {
-              const mo = new MutationObserver(muts => {
-                muts.forEach(m => {
-                  if (m.type === 'attributes' && (m.attributeName === 'src' || m.attributeName === 'href')) {
-                    const n = m.target; const url = n.src || n.href || ''; if (url) send('attr-change', url, {tag: n.tagName, attr: m.attributeName});
+            Node.prototype.appendChild = function(ch){
+              try{
+                if(ch && ch.tagName){
+                  const u = ch.src || ch.href || '';
+                  if (u) send('dom-append', u, {tag: ch.tagName});
+                  if (ch.tagName === 'IFRAME') {
+                    // signal parent to instrument child
+                    send('child-iframe', u||'(blank)', {});
                   }
-                  (m.addedNodes || []).forEach(n => {
-                    if (n && n.tagName) {
-                      const url = n.src || n.href || ''; if (url) send('dom-add', url, {tag: n.tagName});
-                      if (n.querySelectorAll) {
-                        n.querySelectorAll('[src],[href]').forEach(nn => { const u = nn.src || nn.href || ''; if (u) send('nested-element', u, {tag: nn.tagName}); });
-                      }
+                }
+              }catch(e){}
+              return _append.call(this, ch);
+            };
+
+            // Observe added nodes and src/href changes (also notify parent on iframes)
+            try{
+              const mo = new MutationObserver(muts=>{
+                muts.forEach(m=>{
+                  if(m.type==='attributes' && (m.attributeName==='src'||m.attributeName==='href')){
+                    const n=m.target; const u=n.src||n.href||''; 
+                    send('attr-change', u, {tag:n.tagName, attr:m.attributeName});
+                    if(n.tagName==='IFRAME'){ send('child-iframe', u||'(blank)', {}); }
+                  }
+                  (m.addedNodes||[]).forEach(n=>{
+                    if(n && n.tagName){
+                      const u=n.src||n.href||''; send('dom-add', u||'(none)', {tag:n.tagName});
+                      if(n.tagName==='IFRAME'){ send('child-iframe', u||'(blank)', {}); }
                     }
                   });
                 });
               });
-              mo.observe(document.documentElement, { childList:true, subtree:true, attributes:true, attributeFilter:['src','href'] });
-            } catch(e){ send('mo-error','',{message:e.message}); }
+              mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src','href']});
+            }catch(e){ send('mo-error','',{message:e.message}); }
 
-            // PerformanceObserver (resource-level events for this frame)
-            try {
-              if ('PerformanceObserver' in window) {
-                const po = new PerformanceObserver(list => {
-                  list.getEntries().forEach(ent => { if (ent && ent.name) send('perf-entry', ent.name, {type: ent.initiatorType, duration: ent.duration}); });
-                });
-                po.observe({ entryTypes: ['resource'] });
+            // property setters for src/href
+            try{ const d=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLIFrameElement.prototype,'src',{set(v){ send('iframe-src',String(v),{}); return d.set.call(this,v);},get(){return d.get.call(this);}});}catch(e){}
+            try{ const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLImageElement.prototype,'src',{set(v){ send('img-src',String(v),{}); return d.set.call(this,v);},get(){return d.get.call(this);}});}catch(e){}
+            try{ const d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLScriptElement.prototype,'src',{set(v){ send('script-src',String(v),{}); return d.set.call(this,v);},get(){return d.get.call(this);}});}catch(e){}
+            try{ const d=Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype,'href'); if(d&&d.set) Object.defineProperty(HTMLLinkElement.prototype,'href',{set(v){ send('link-href',String(v),{}); return d.set.call(this,v);},get(){return d.get.call(this);}});}catch(e){}
+
+            // document.write sniff
+            const _w = document.write.bind(document), _wl = document.writeln.bind(document);
+            function sniff(args){ try{ const s=Array.from(args).join(''); (s.match(/https?:\\/\\/[^"'>\\s)]+/gi)||[]).forEach(u=>send('doc-url',u,{})); }catch(e){} }
+            document.write   = function(){ sniff(arguments); return _w.apply(document, arguments); };
+            document.writeln = function(){ sniff(arguments); return _wl.apply(document, arguments); };
+
+            // Performance entries
+            try{
+              if('PerformanceObserver' in window){
+                const po=new PerformanceObserver(list=>{ list.getEntries().forEach(ent=>{ if(ent && ent.name) send('perf-entry', ent.name, {type:ent.initiatorType});});});
+                po.observe({entryTypes:['resource']});
               }
-            } catch(e){ send('perf-error','',{message:e.message}); }
+            }catch(e){ send('perf-error','',{message:e.message}); }
 
             send('bootstrap-ready', location.href, {});
           })();
@@ -280,16 +385,30 @@
         <!doctype html>
         <html><head><meta charset="utf-8"><style>body{margin:0}.dcmads{display:block!important}</style></head>
         <body>
-          ${bootstrap}
+          ${BOOTSTRAP}
           <div id="tag-container">${tagContent}</div>
         </body></html>
       `;
 
       iframe.onload  = () => { logNetworkActivity('sandbox','success','Sandbox iframe loaded'); wrapper.style.border='2px solid #4CAF50'; wrapper.querySelector('strong').textContent='CM360 Creative Sandbox (Loaded):'; };
       iframe.onerror = () => { logNetworkActivity('sandbox','error','Sandbox iframe failed to load'); wrapper.style.border='2px solid #F44336'; wrapper.querySelector('strong').textContent='CM360 Creative Sandbox (Error):'; };
+
+      // When the sandbox tells us an iframe was added/changed, try to inject hooks if it's about:blank
+      window.addEventListener('message', (evt)=>{
+        const d = evt.data || {};
+        if (d && d.kind === 'child-iframe') {
+          // scan current sandbox DOM for iframes and instrument blank ones
+          try {
+            const doc = iframe.contentDocument;
+            if (!doc) return;
+            const frames = Array.from(doc.querySelectorAll('iframe'));
+            frames.forEach(f => instrumentAboutBlankIframe(f));
+          } catch(e){}
+        }
+      });
     }
 
-    // Receive sandbox events (these feed into checkPixelUrl via logNetworkActivity)
+    // ---- Receive sandbox & child-frame events ----
     window.addEventListener('message', (evt) => {
       const d = evt.data || {}; if (!d || !d.kind) return;
       const labelMap = {
@@ -300,13 +419,14 @@
         'script-src':'Script src set','link-href':'Link href set','attr-set':'Attribute set',
         'attr-change':'Attribute changed','dom-add':'Element added','nested-element':'Nested element detected',
         'doc-url':'URL found in document.write','perf-entry':'Resource performance entry',
-        'mo-error':'MutationObserver error','perf-error':'PerformanceObserver error','bootstrap-ready':'Sandbox ready'
+        'mo-error':'MutationObserver error','perf-error':'PerformanceObserver error',
+        'bootstrap-ready':'Sandbox ready','child-hooks-ready':'Child iframe ready','child-iframe':'Child iframe noticed'
       };
       const status = /error/i.test(d.kind) ? 'error' : 'success';
       logNetworkActivity(d.url || '(unknown)', status, `[Sandbox] ${labelMap[d.kind] || d.kind}`);
     });
 
-    // Boot
+    // ---- Boot ----
     initializePixelTracking();
     const params = new URLSearchParams(window.location.search);
     const rawTag = decodeURIComponent(params.get("tag") || "");
@@ -316,9 +436,11 @@
     document.getElementById("creative").appendChild(header);
 
     if (rawTag && rawTag.trim()) {
-      expectedPixels.forEach(p => markPixelPending(p.name));     // show “pending” immediately
+      expectedPixels.forEach(p => markPixelPending(p.name)); // pending immediately
       runTagInSandbox(rawTag);
-      setTimeout(() => {                                         // fallback timeout
+
+      // Fallback timeout
+      setTimeout(() => {
         expectedPixels.forEach(pixel => {
           if (pixelStatus[pixel.name] === 'pending') {
             pixelStatus[pixel.name] = 'not-fired';

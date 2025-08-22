@@ -5,136 +5,26 @@
   <title>CM360 Tag Viewer</title>
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    body { 
-      font-family: 'Segoe UI', sans-serif; 
-      margin: 0; 
-      display: flex; 
-      height: 100vh; 
-      background: linear-gradient(135deg, #E6F0FA 0%, #F0F6FF 100%);
-      color: #0A1E3F;
-    }
-    #leftPanel {
-      width: 50%; 
-      height: 100%; 
-      padding: 15px; 
-      border-right: 2px solid #0055A4; 
-      overflow: auto; 
-      display: flex; 
-      flex-direction: column;
-      background-color: #ffffff;
-      box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-    }
-    #creative { 
-      flex: 1; 
-      border: 1px solid #0055A4;
-      border-radius: 8px;
-      padding: 10px;
-      background-color: #F0F6FF;
-      overflow: auto;
-    }
-    #log { 
-      width: 50%; 
-      height: 100%; 
-      padding: 20px; 
-      background-color: #F0F6FF; 
-      overflow-y: auto;
-    }
-    h3 { 
-      margin-top: 0; 
-      color: #0055A4; 
-      font-weight: 600;
-      font-size: 1.4em;
-      margin-bottom: 20px;
-    }
-    .pixel-check { 
-      font-size: 14px; 
-      margin: 8px 0; 
-      padding: 8px 12px;
-      border-radius: 6px;
-      border-left: 4px solid;
-      background-color: #ffffff;
-    }
-    .fired { 
-      color: #2E7D32; 
-      font-weight: 600;
-      border-left-color: #4CAF50;
-      background-color: #E8F5E8;
-    }
-    .not-fired { 
-      color: #C9302C;
-      border-left-color: #F44336;
-      background-color: #FFEBEE;
-    }
-    .pending {
-      color: #FF9800;
-      border-left-color: #FF9800;
-      background-color: #FFF3E0;
-    }
-    #backButton {
-      margin-bottom: 12px; 
-      padding: 12px 24px; 
-      font-size: 14px; 
-      cursor: pointer; 
-      border: none; 
-      border-radius: 8px; 
-      background: linear-gradient(135deg, #0055A4 0%, #007ACC 100%);
-      color: #fff; 
-      font-weight: 600;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 8px rgba(0, 85, 164, 0.3);
-    }
-    #backButton:hover { 
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0, 85, 164, 0.4);
-    }
-    .stats {
-      background-color: #ffffff;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      border: 1px solid #0055A4;
-    }
-    .stats-item {
-      display: inline-block;
-      margin-right: 20px;
-      font-weight: 600;
-    }
-    .fired-count { color: #2E7D32; }
-    .pending-count { color: #FF9800; }
-    .not-fired-count { color: #C9302C; }
-    .network-log {
-      max-height: 260px;
-      overflow-y: auto;
-      background-color: #ffffff;
-      border: 1px solid #0055A4;
-      border-radius: 8px;
-      padding: 10px;
-      margin-top: 20px;
-      font-family: monospace;
-      font-size: 12px;
-    }
-    .network-entry {
-      margin: 2px 0;
-      padding: 2px 4px;
-      border-radius: 3px;
-    }
-    .network-success { background-color: #E8F5E8; }
-    .network-error { background-color: #FFEBEE; }
+    body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; background: linear-gradient(135deg, #E6F0FA 0%, #F0F6FF 100%); color: #0A1E3F; }
+    #leftPanel { width: 50%; height: 100%; padding: 15px; border-right: 2px solid #0055A4; overflow: auto; display: flex; flex-direction: column; background-color: #ffffff; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
+    #creative { flex: 1; border: 1px solid #0055A4; border-radius: 8px; padding: 10px; background-color: #F0F6FF; overflow: auto; }
+    #log { width: 50%; height: 100%; padding: 20px; background-color: #F0F6FF; overflow-y: auto; }
+    h3 { margin-top: 0; color: #0055A4; font-weight: 600; font-size: 1.4em; margin-bottom: 20px; }
+    .pixel-check { font-size: 14px; margin: 8px 0; padding: 8px 12px; border-radius: 6px; border-left: 4px solid; background-color: #ffffff; }
+    .fired { color: #2E7D32; font-weight: 600; border-left-color: #4CAF50; background-color: #E8F5E8; }
+    .not-fired { color: #C9302C; border-left-color: #F44336; background-color: #FFEBEE; }
+    .pending { color: #FF9800; border-left-color: #FF9800; background-color: #FFF3E0; }
+    #backButton { margin-bottom: 12px; padding: 12px 24px; font-size: 14px; cursor: pointer; border: none; border-radius: 8px; background: linear-gradient(135deg, #0055A4 0%, #007ACC 100%); color: #fff; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0, 85, 164, 0.3); }
+    #backButton:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 85, 164, 0.4); }
+    .stats { background-color: #ffffff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #0055A4; }
+    .stats-item { display: inline-block; margin-right: 20px; font-weight: 600; }
+    .fired-count { color: #2E7D32; } .pending-count { color: #FF9800; } .not-fired-count { color: #C9302C; }
+    .network-log { max-height: 260px; overflow-y: auto; background-color: #ffffff; border: 1px solid #0055A4; border-radius: 8px; padding: 10px; margin-top: 20px; font-family: monospace; font-size: 12px; }
+    .network-entry { margin: 2px 0; padding: 2px 4px; border-radius: 3px; }
+    .network-success { background-color: #E8F5E8; } .network-error { background-color: #FFEBEE; }
     .network-pixel { background-color: #FFF3E0; border: 1px solid #FF9800; }
-    .clear-btn {
-      background: none;
-      border: 1px solid #0055A4;
-      color: #0055A4;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      cursor: pointer;
-      margin-top: 10px;
-    }
-    .clear-btn:hover {
-      background-color: #0055A4;
-      color: white;
-    }
+    .clear-btn { background: none; border: 1px solid #0055A4; color: #0055A4; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-top: 10px; }
+    .clear-btn:hover { background-color: #0055A4; color: white; }
   </style>
 </head>
 <body>
@@ -150,16 +40,14 @@
       <span class="stats-item not-fired-count">❌ Not Detected: <span id="notFiredCount">0</span></span>
     </div>
     <div id="pixelList"></div>
-    
+
     <h3>Network Activity</h3>
     <button class="clear-btn" onclick="clearNetworkLog()">Clear Log</button>
     <div id="networkLog" class="network-log"></div>
   </div>
 
   <script>
-    // -----------------------------
-    // Config with updated patterns
-    // -----------------------------
+    // Keep your vendor list as in your file
     const expectedPixels = [
       { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
       { name: "LiveRamp", patterns: ["rlcdn.com", "liveramp.com", "ats-sb.lp4.io", "ramp.com"] },
@@ -171,9 +59,6 @@
       { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
     ];
 
-    // -----------------------------
-    // UI state + helpers
-    // -----------------------------
     const pixelStatus = {};
     const networkLog = [];
     let networkLogElement, pixelListElement;
@@ -181,7 +66,6 @@
     function initializePixelTracking() {
       pixelListElement = document.getElementById("pixelList");
       networkLogElement = document.getElementById("networkLog");
-
       expectedPixels.forEach(pixel => {
         pixelStatus[pixel.name] = 'not-fired';
         const el = document.createElement("div");
@@ -197,11 +81,7 @@
       if (pixelStatus[name] !== 'fired') {
         pixelStatus[name] = 'fired';
         const el = document.getElementById(`pixel-${name.replace(/[^a-zA-Z0-9]/g, '')}`);
-        if (el) {
-          el.className = "pixel-check fired";
-          el.textContent = `✅ ${name}: Detected`;
-        }
-        // Log pixel detection separately to avoid recursion
+        if (el) { el.className = "pixel-check fired"; el.textContent = `✅ ${name}: Detected`; }
         logPixelDetection(name, url);
         updateStats();
       }
@@ -211,44 +91,32 @@
       if (pixelStatus[name] === 'not-fired') {
         pixelStatus[name] = 'pending';
         const el = document.getElementById(`pixel-${name.replace(/[^a-zA-Z0-9]/g, '')}`);
-        if (el) {
-          el.className = "pixel-check pending";
-          el.textContent = `⏳ ${name}: Loading...`;
-        }
+        if (el) { el.className = "pixel-check pending"; el.textContent = `⏳ ${name}: Loading...`; }
         updateStats();
       }
     }
 
     function updateStats() {
-      const fired = Object.values(pixelStatus).filter(s => s === 'fired').length;
-      const pending = Object.values(pixelStatus).filter(s => s === 'pending').length;
-      const notFired = Object.values(pixelStatus).filter(s => s === 'not-fired').length;
-
-      document.getElementById('firedCount').textContent = fired;
-      document.getElementById('pendingCount').textContent = pending;
-      document.getElementById('notFiredCount').textContent = notFired;
+      const vals = Object.values(pixelStatus);
+      document.getElementById('firedCount').textContent = vals.filter(s => s === 'fired').length;
+      document.getElementById('pendingCount').textContent = vals.filter(s => s === 'pending').length;
+      document.getElementById('notFiredCount').textContent = vals.filter(s => s === 'not-fired').length;
     }
 
     function logNetworkActivity(url, status, description) {
       const timestamp = new Date().toLocaleTimeString();
-      const entry = { timestamp, url, status, description };
-      networkLog.push(entry);
-
+      networkLog.push({ timestamp, url, status, description });
       const logEntry = document.createElement('div');
       logEntry.className = `network-entry network-${status}`;
       logEntry.textContent = `[${timestamp}] ${description}: ${url}`;
       networkLogElement.appendChild(logEntry);
       networkLogElement.scrollTop = networkLogElement.scrollHeight;
-
-      // Check for pixels AFTER logging to avoid recursion
-      setTimeout(() => checkPixelUrl(url), 0);
+      setTimeout(() => checkPixelUrl(url), 0); // detect after logging
     }
 
     function logPixelDetection(name, url) {
       const timestamp = new Date().toLocaleTimeString();
-      const entry = { timestamp, url, status: 'pixel', description: `${name} PIXEL FIRED` };
-      networkLog.push(entry);
-
+      networkLog.push({ timestamp, url, status: 'pixel', description: `${name} PIXEL FIRED` });
       const logEntry = document.createElement('div');
       logEntry.className = 'network-entry network-pixel';
       logEntry.textContent = `[${timestamp}] 🎯 ${name} PIXEL FIRED: ${url}`;
@@ -256,387 +124,213 @@
       networkLogElement.scrollTop = networkLogElement.scrollHeight;
     }
 
-    function clearNetworkLog() {
-      networkLog.length = 0;
-      networkLogElement.innerHTML = '';
-    }
+    function clearNetworkLog() { networkLog.length = 0; networkLogElement.innerHTML = ''; }
 
-    // -----------------------------
-    // Enhanced pixel detection with better pattern matching
-    // -----------------------------
+    // Hostname-aware, case-insensitive matching (no vendor list changes needed)
     function checkPixelUrl(url) {
       if (!url || typeof url !== 'string') return;
-
-      let fullUrl = "";
-      let hostname = "";
-      
+      let full = "", host = "";
       try {
-        const urlObj = new URL(url, window.location.href);
-        fullUrl = urlObj.href.toLowerCase();
-        hostname = urlObj.hostname.toLowerCase();
-      } catch {
-        fullUrl = url.toLowerCase();
-        // Extract hostname manually if URL constructor fails
-        const match = url.match(/^https?:\/\/([^\/\?#]+)/i);
-        hostname = match ? match[1].toLowerCase() : '';
-      }
-
+        const u = new URL(url, window.location.href);
+        full = u.href.toLowerCase();
+        host = u.hostname.toLowerCase();
+      } catch { full = String(url).toLowerCase(); }
       expectedPixels.forEach(pixel => {
-        const isMatch = pixel.patterns.some(pattern => {
-          const p = pattern.toLowerCase().trim();
-          
-          // Domain-based matching (covers subdomains)
-          if (p.includes('.') && !p.startsWith('/') && !p.includes('?')) {
-            if (hostname === p || hostname.endsWith('.' + p)) {
-              console.log(`✅ Domain match for ${pixel.name}: ${hostname} matches pattern ${p}`);
-              return true;
-            }
+        const hit = pixel.patterns.some(pat => {
+          const p = String(pat).toLowerCase().trim();
+          if (p.includes(".") && !p.startsWith("/") && host) { // domain-like
+            if (host === p || host.endsWith("." + p)) return true;
           }
-          
-          // Path or file extension matching
-          if (fullUrl.includes(p)) {
-            console.log(`✅ URL match for ${pixel.name}: ${fullUrl} contains pattern ${p}`);
-            return true;
-          }
-          
-          return false;
+          return full.includes(p); // fallback substring
         });
-
-        if (isMatch) {
-          console.log(`🎯 PIXEL DETECTED: ${pixel.name} from URL: ${url}`);
-          markPixelFired(pixel.name, url);
-        }
+        if (hit) markPixelFired(pixel.name, url);
       });
     }
 
     function goBack() { window.location.href = "index.html"; }
     window.goBack = goBack;
 
-    // -----------------------------
-    // Enhanced sandbox with better CM360 handling
-    // -----------------------------
+    // Run tag inside a sandboxed iframe with deep instrumentation
     function runTagInSandbox(tagContent) {
       const creativeDiv = document.getElementById("creative");
 
-      // Debug panel
+      // Escaped debug view
       const debugDiv = document.createElement('div');
-      debugDiv.style.cssText = 'background: #F0F6FF; border: 1px solid #0055A4; padding: 15px; margin-bottom: 15px; border-radius: 5px; font-family: monospace; font-size: 12px; white-space: pre-wrap; max-height: 220px; overflow-y: auto;';
-      const esc = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      debugDiv.innerHTML = `<strong>Debug Info:</strong><br><strong>Raw Tag Length:</strong> ${tagContent.length}<br><br><strong>Tag Content:</strong><br><code>${esc(tagContent)}</code>`;
+      debugDiv.style.cssText = 'background:#F0F6FF;border:1px solid #0055A4;padding:15px;margin-bottom:15px;border-radius:5px;font-family:monospace;font-size:12px;white-space:pre-wrap;max-height:220px;overflow-y:auto;';
+      const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      debugDiv.innerHTML = `<strong>Debug Info:</strong><br><strong>Raw Tag Length:</strong> ${tagContent.length}<br><br><strong>Tag Content (escaped):</strong><br><code>${esc(tagContent)}</code>`;
       creativeDiv.appendChild(debugDiv);
 
       const wrapper = document.createElement('div');
-      wrapper.style.cssText = 'border: 2px dashed #0055A4; padding: 10px; margin-top: 10px; border-radius: 8px;';
+      wrapper.style.cssText = 'border:2px dashed #0055A4;padding:10px;margin-top:10px;border-radius:8px;';
       wrapper.innerHTML = '<strong>CM360 Creative Sandbox:</strong><br><br>';
       creativeDiv.appendChild(wrapper);
 
       const iframe = document.createElement('iframe');
       iframe.sandbox = 'allow-scripts allow-same-origin allow-forms allow-popups';
-      iframe.style.width = '300px';
-      iframe.style.height = '250px';
-      iframe.style.border = '1px solid #ccc';
+      iframe.style.width = '300px'; iframe.style.height = '250px'; iframe.style.border = '1px solid #ccc';
       wrapper.appendChild(iframe);
 
-      // Enhanced bootstrap script with more comprehensive monitoring
+      // Bootstrap that runs inside the iframe and reports back
       const bootstrap = `
         <script>
           (function() {
-            console.log('Sandbox bootstrap starting...');
-            
-            function send(kind, url, extra) {
-              try { 
-                console.log('Sending to parent:', kind, url, extra);
-                parent.postMessage({kind, url, extra}, '*'); 
-              } catch (e) {
-                console.error('Failed to send to parent:', e);
-              }
-            }
+            function send(kind, url, extra) { try { parent.postMessage({kind, url, extra}, '*'); } catch(e) {} }
 
-            // Enhanced fetch monitoring
+            // fetch
             const _fetch = window.fetch;
             window.fetch = function(...args) {
               const url = (args[0] && args[0].url) ? args[0].url : String(args[0]);
-              console.log('Fetch intercepted:', url);
               send('fetch-init', url, {});
-              return _fetch.apply(this, args).then(r => {
-                console.log('Fetch success:', url, r.status);
-                send('fetch-done', url, {status: r.status});
-                return r;
-              }).catch(err => {
-                console.error('Fetch error:', url, err);
-                send('fetch-error', url, {message: err && err.message});
-                throw err;
-              });
+              return _fetch.apply(this, args).then(r => { send('fetch-done', url, {status:r.status}); return r; })
+                                           .catch(err => { send('fetch-error', url, {message:err && err.message}); throw err; });
             };
 
-            // Enhanced XHR monitoring
+            // XHR
             const _XHR = window.XMLHttpRequest;
             window.XMLHttpRequest = function() {
-              const xhr = new _XHR();
-              const _open = xhr.open;
-              xhr.open = function(method, url, ...rest) {
-                xhr.__mon_url = url;
-                console.log('XHR opened:', method, url);
-                send('xhr-open', url, {method});
-                return _open.apply(this, [method, url, ...rest]);
-              };
-              xhr.addEventListener('load', function() {
-                console.log('XHR loaded:', xhr.__mon_url, xhr.status);
-                send('xhr-done', xhr.__mon_url || '', {status: xhr.status});
-              });
-              xhr.addEventListener('error', function() {
-                console.error('XHR error:', xhr.__mon_url);
-                send('xhr-error', xhr.__mon_url || '', {});
-              });
+              const xhr = new _XHR(); const _open = xhr.open;
+              xhr.open = function(method, url, ...rest) { xhr.__mon_url = url; send('xhr-open', url, {method}); return _open.apply(this, [method, url, ...rest]); };
+              xhr.addEventListener('load',  () => send('xhr-done',  xhr.__mon_url || '', {status:xhr.status}));
+              xhr.addEventListener('error', () => send('xhr-error', xhr.__mon_url || '', {}));
               return xhr;
             };
 
-            // Enhanced DOM monitoring
+            // sendBeacon (used by some vendors)
+            if (navigator && navigator.sendBeacon) {
+              const _beacon = navigator.sendBeacon.bind(navigator);
+              navigator.sendBeacon = function(url, data) { send('beacon', String(url||''), {}); return _beacon(url, data); };
+            }
+
+            // appendChild
             const _append = Node.prototype.appendChild;
             Node.prototype.appendChild = function(child) {
-              try {
-                if (child && child.tagName) {
-                  const url = child.src || child.href || '';
-                  if (url) {
-                    console.log('DOM append:', child.tagName, url);
-                    send('dom-append', url, {tag: child.tagName});
-                  }
-                }
-              } catch (e) {
-                console.error('DOM append error:', e);
-              }
+              try { if (child && child.tagName) { const u = child.src || child.href || ''; if (u) send('dom-append', u, {tag: child.tagName}); } } catch(e){}
               return _append.call(this, child);
             };
 
-            // Image src monitoring with error handling
-            try {
-              const imgDesc = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
-              if (imgDesc && imgDesc.set) {
-                Object.defineProperty(HTMLImageElement.prototype, 'src', {
-                  set(v) { 
-                    console.log('Image src set:', v);
-                    send('img-src', String(v), {}); 
-                    return imgDesc.set.call(this, v); 
-                  },
-                  get() { return imgDesc.get.call(this); }
-                });
-              }
-            } catch(e) {
-              console.error('Image src patch failed:', e);
-            }
+            // setAttribute for src/href
+            const _setAttr = Element.prototype.setAttribute;
+            Element.prototype.setAttribute = function(name, value) {
+              try { if ((name === 'src' || name === 'href') && value) { send('attr-set', String(value), {tag:this.tagName, attr:name}); } } catch(e){}
+              return _setAttr.apply(this, arguments);
+            };
 
-            // Script src monitoring
+            // property setters (img/src, iframe/src, script/src, link/href)
             try {
-              const scriptDesc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
-              if (scriptDesc && scriptDesc.set) {
-                Object.defineProperty(HTMLScriptElement.prototype, 'src', {
-                  set(v) { 
-                    console.log('Script src set:', v);
-                    send('script-src', String(v), {}); 
-                    return scriptDesc.set.call(this, v); 
-                  },
-                  get() { return scriptDesc.get.call(this); }
-                });
-              }
-            } catch(e) {
-              console.error('Script src patch failed:', e);
-            }
+              const dImg = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+              if (dImg && dImg.set) Object.defineProperty(HTMLImageElement.prototype, 'src', { set(v){ send('img-src', String(v), {}); return dImg.set.call(this, v); }, get(){ return dImg.get.call(this); } });
+            } catch(e){}
+            try {
+              const dIf = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'src');
+              if (dIf && dIf.set) Object.defineProperty(HTMLIFrameElement.prototype, 'src', { set(v){ send('iframe-src', String(v), {}); return dIf.set.call(this, v); }, get(){ return dIf.get.call(this); } });
+            } catch(e){}
+            try {
+              const dSc = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+              if (dSc && dSc.set) Object.defineProperty(HTMLScriptElement.prototype, 'src', { set(v){ send('script-src', String(v), {}); return dSc.set.call(this, v); }, get(){ return dSc.get.call(this); } });
+            } catch(e){}
+            try {
+              const dLk = Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype, 'href');
+              if (dLk && dLk.set) Object.defineProperty(HTMLLinkElement.prototype, 'href', { set(v){ send('link-href', String(v), {}); return dLk.set.call(this, v); }, get(){ return dLk.get.call(this); } });
+            } catch(e){}
 
-            // Enhanced MutationObserver
+            // document.write / writeln (log embedded URLs)
+            const _write = document.write.bind(document);
+            const _writeln = document.writeln.bind(document);
+            function logStrings(args){ try { const s = Array.from(args).join(''); const urls = s.match(/https?:\\/\\/[^"'>\\s)]+/gi) || []; urls.forEach(u => send('doc-url', u, {})); } catch(e){} }
+            document.write = function(){ logStrings(arguments); return _write.apply(document, arguments); };
+            document.writeln = function(){ logStrings(arguments); return _writeln.apply(document, arguments); };
+
+            // MutationObserver (added nodes + src/href changes)
             try {
-              const mo = new MutationObserver((mutations) => {
-                mutations.forEach(m => {
+              const mo = new MutationObserver(muts => {
+                muts.forEach(m => {
                   if (m.type === 'attributes' && (m.attributeName === 'src' || m.attributeName === 'href')) {
-                    const n = m.target;
-                    const url = n.src || n.href || '';
-                    if (url) {
-                      console.log('Attribute changed:', n.tagName, m.attributeName, url);
-                      send('attr-change', url, {tag: n.tagName, attr: m.attributeName});
-                    }
+                    const n = m.target; const url = n.src || n.href || ''; if (url) send('attr-change', url, {tag: n.tagName, attr: m.attributeName});
                   }
-                  
-                  if (m.addedNodes) {
-                    m.addedNodes.forEach(n => {
-                      if (n && n.tagName) {
-                        const url = n.src || n.href || '';
-                        if (url) {
-                          console.log('Node added:', n.tagName, url);
-                          send('dom-add', url, {tag: n.tagName});
-                        }
-                        
-                        // Check for nested elements
-                        if (n.querySelectorAll) {
-                          const nestedElements = n.querySelectorAll('[src], [href]');
-                          nestedElements.forEach(nested => {
-                            const nestedUrl = nested.src || nested.href || '';
-                            if (nestedUrl) {
-                              console.log('Nested element found:', nested.tagName, nestedUrl);
-                              send('nested-element', nestedUrl, {tag: nested.tagName});
-                            }
-                          });
-                        }
+                  (m.addedNodes || []).forEach(n => {
+                    if (n && n.tagName) {
+                      const url = n.src || n.href || ''; if (url) send('dom-add', url, {tag: n.tagName});
+                      if (n.querySelectorAll) {
+                        n.querySelectorAll('[src],[href]').forEach(nn => { const u = nn.src || nn.href || ''; if (u) send('nested-element', u, {tag: nn.tagName}); });
                       }
-                    });
-                  }
-                });
-              });
-              mo.observe(document.documentElement, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['src', 'href']
-              });
-              console.log('MutationObserver started');
-            } catch(e) {
-              console.error('MutationObserver failed:', e);
-              send('mo-error', '', {message: e.message});
-            }
-
-            // Performance monitoring
-            try {
-              if ('PerformanceObserver' in window) {
-                const po = new PerformanceObserver((list) => {
-                  list.getEntries().forEach((entry) => {
-                    if (entry && entry.name) {
-                      console.log('Performance entry:', entry.initiatorType, entry.name);
-                      send('perf-entry', entry.name, {type: entry.initiatorType, duration: entry.duration});
                     }
                   });
                 });
-                po.observe({ entryTypes: ['resource'] });
-                console.log('PerformanceObserver started');
-              }
-            } catch(e) {
-              console.error('PerformanceObserver failed:', e);
-              send('perf-error', '', {message: e.message});
-            }
+              });
+              mo.observe(document.documentElement, { childList:true, subtree:true, attributes:true, attributeFilter:['src','href'] });
+            } catch(e){ send('mo-error','',{message:e.message}); }
 
-            // Ready signal
-            console.log('Bootstrap complete');
+            // PerformanceObserver (resource-level events for this frame)
+            try {
+              if ('PerformanceObserver' in window) {
+                const po = new PerformanceObserver(list => {
+                  list.getEntries().forEach(ent => { if (ent && ent.name) send('perf-entry', ent.name, {type: ent.initiatorType, duration: ent.duration}); });
+                });
+                po.observe({ entryTypes: ['resource'] });
+              }
+            } catch(e){ send('perf-error','',{message:e.message}); }
+
             send('bootstrap-ready', location.href, {});
           })();
         <\/script>
       `;
 
-      // Enhanced srcdoc with better CM360 support
       iframe.srcdoc = `
         <!doctype html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            body { margin: 0; padding: 0; }
-            .dcmads { display: block !important; }
-          </style>
-        </head>
+        <html><head><meta charset="utf-8"><style>body{margin:0}.dcmads{display:block!important}</style></head>
         <body>
           ${bootstrap}
-          <div id="tag-container">
-            ${tagContent}
-          </div>
-          <script>
-            // Additional check for CM360 elements after DOM load
-            setTimeout(() => {
-              const dcmElements = document.querySelectorAll('.dcmads, [data-dcm-placement]');
-              console.log('CM360 elements found:', dcmElements.length);
-              dcmElements.forEach((el, i) => {
-                console.log('CM360 element', i, ':', el.outerHTML);
-              });
-              
-              const iframes = document.querySelectorAll('iframe');
-              console.log('Iframes found:', iframes.length);
-              iframes.forEach((iframe, i) => {
-                console.log('Iframe', i, ':', iframe.src);
-              });
-            }, 2000);
-          <\/script>
-        </body>
-        </html>
+          <div id="tag-container">${tagContent}</div>
+        </body></html>
       `;
 
-      iframe.onload = () => {
-        logNetworkActivity('sandbox', 'success', 'Sandbox iframe loaded');
-        wrapper.style.border = '2px solid #4CAF50';
-        wrapper.querySelector('strong').textContent = 'CM360 Creative Sandbox (Loaded):';
-      };
-      
-      iframe.onerror = () => {
-        logNetworkActivity('sandbox', 'error', 'Sandbox iframe failed to load');
-        wrapper.style.border = '2px solid #F44336';
-        wrapper.querySelector('strong').textContent = 'CM360 Creative Sandbox (Error):';
-      };
+      iframe.onload  = () => { logNetworkActivity('sandbox','success','Sandbox iframe loaded'); wrapper.style.border='2px solid #4CAF50'; wrapper.querySelector('strong').textContent='CM360 Creative Sandbox (Loaded):'; };
+      iframe.onerror = () => { logNetworkActivity('sandbox','error','Sandbox iframe failed to load'); wrapper.style.border='2px solid #F44336'; wrapper.querySelector('strong').textContent='CM360 Creative Sandbox (Error):'; };
     }
 
-    // Enhanced message handling with better logging
+    // Receive sandbox events (these feed into checkPixelUrl via logNetworkActivity)
     window.addEventListener('message', (evt) => {
-      const d = evt.data || {};
-      if (!d || !d.kind) return;
-      
+      const d = evt.data || {}; if (!d || !d.kind) return;
       const labelMap = {
-        'fetch-init': 'Fetch request initiated',
-        'fetch-done': 'Fetch request completed',
-        'fetch-error': 'Fetch request failed',
-        'xhr-open': 'XHR request opened',
-        'xhr-done': 'XHR request completed',
-        'xhr-error': 'XHR request failed',
-        'dom-append': 'Element appended to DOM',
-        'img-src': 'Image source assigned',
-        'script-src': 'Script source assigned',
-        'attr-change': 'Element attribute changed',
-        'dom-add': 'Element added to DOM',
-        'nested-element': 'Nested element detected',
-        'perf-entry': 'Resource performance entry',
-        'mo-error': 'MutationObserver error',
-        'perf-error': 'PerformanceObserver error',
-        'bootstrap-ready': 'Sandbox initialization complete'
+        'fetch-init':'Fetch request initiated','fetch-done':'Fetch request completed','fetch-error':'Fetch request failed',
+        'xhr-open':'XHR request opened','xhr-done':'XHR request completed','xhr-error':'XHR request failed',
+        'beacon':'Beacon sent',
+        'dom-append':'Element appended','img-src':'Image src set','iframe-src':'Iframe src set',
+        'script-src':'Script src set','link-href':'Link href set','attr-set':'Attribute set',
+        'attr-change':'Attribute changed','dom-add':'Element added','nested-element':'Nested element detected',
+        'doc-url':'URL found in document.write','perf-entry':'Resource performance entry',
+        'mo-error':'MutationObserver error','perf-error':'PerformanceObserver error','bootstrap-ready':'Sandbox ready'
       };
-      
       const status = /error/i.test(d.kind) ? 'error' : 'success';
-      const label = labelMap[d.kind] || d.kind;
-      
-      console.log('Received from sandbox:', d.kind, d.url, d.extra);
-      logNetworkActivity(d.url || '(unknown)', status, `[Sandbox] ${label}`);
+      logNetworkActivity(d.url || '(unknown)', status, `[Sandbox] ${labelMap[d.kind] || d.kind}`);
     });
 
-    // -----------------------------
-    // Initialize everything
-    // -----------------------------
+    // Boot
     initializePixelTracking();
-
     const params = new URLSearchParams(window.location.search);
     const rawTag = decodeURIComponent(params.get("tag") || "");
-
     const header = document.createElement('div');
     header.style.cssText = 'background:#E6F0FA;border:1px solid #0055A4;padding:12px;border-radius:6px;margin-bottom:15px;font-weight:600;';
     header.textContent = params.get("tag") ? '✅ Tag parameter detected - initializing sandbox...' : '❌ No tag parameter found in URL.';
     document.getElementById("creative").appendChild(header);
 
     if (rawTag && rawTag.trim()) {
-      // Mark all pixels as pending initially
-      expectedPixels.forEach(pixel => markPixelPending(pixel.name));
-      
-      // Start the sandbox
+      expectedPixels.forEach(p => markPixelPending(p.name));     // show “pending” immediately
       runTagInSandbox(rawTag);
-
-      // Timeout fallback: mark pending pixels as not detected after 12 seconds
-      setTimeout(() => {
+      setTimeout(() => {                                         // fallback timeout
         expectedPixels.forEach(pixel => {
           if (pixelStatus[pixel.name] === 'pending') {
             pixelStatus[pixel.name] = 'not-fired';
             const el = document.getElementById(`pixel-${pixel.name.replace(/[^a-zA-Z0-9]/g, '')}`);
-            if (el) {
-              el.className = "pixel-check not-fired";
-              el.textContent = `❌ ${pixel.name}: Timeout (no activity detected)`;
-            }
+            if (el) { el.className = "pixel-check not-fired"; el.textContent = `❌ ${pixel.name}: Timeout (no activity detected)`; }
           }
         });
         updateStats();
-        logNetworkActivity('timeout', 'error', 'Pixel detection timeout reached (12s)');
+        logNetworkActivity('timeout','error','Pixel detection timeout reached');
       }, 12000);
-      
     } else {
-      document.getElementById("creative").innerHTML += "<p style='color: #C9302C; text-align: center; padding: 20px;'>❌ No tag content received or tag is empty.</p>";
+      document.getElementById("creative").innerHTML += "<p style='color:#C9302C; text-align:center; padding:20px;'>❌ No tag content received or tag is empty.</p>";
     }
   </script>
 </body>

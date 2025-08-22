@@ -5,11 +5,13 @@
   <title>CM360 Tag Tester</title>
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    body { 
-      font-family: 'Segoe UI', sans-serif; 
+    /* ---- Original look & feel preserved ---- */
+    :root { --blue:#0055A4; --blue2:#007ACC; --bg1:#E6F0FA; --bg2:#F0F6FF; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
       margin: 0;
       min-height: 100vh;
-      background: linear-gradient(135deg, #E6F0FA 0%, #F0F6FF 100%);
+      background: linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 100%);
       color: #0A1E3F;
       display: flex;
       align-items: center;
@@ -20,95 +22,144 @@
       padding: 40px;
       border-radius: 15px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-      width: 90%;
-      max-width: 600px;
-      border: 2px solid #0055A4;
+      width: 92%;
+      max-width: 1100px; /* wider to fit two windows */
+      border: 2px solid var(--blue);
     }
-    h1 { 
-      margin-top: 0; 
-      color: #0055A4; 
+    h1 {
+      margin: 0 0 10px;
+      color: var(--blue);
       text-align: center;
       font-weight: 600;
       font-size: 2.5em;
-      margin-bottom: 10px;
     }
-    p {
+    p.lead {
       text-align: center;
       font-size: 1.1em;
-      margin-bottom: 30px;
+      margin: 0 0 24px;
       color: #0A1E3F;
     }
-    textarea { 
-      width: 100%; 
-      height: 200px; 
-      margin-bottom: 20px;
-      border: 2px solid #0055A4;
+
+    /* ---- Two “windows” side by side (responsive) ---- */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+    @media (min-width: 900px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--blue);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .card h2 {
+      margin: 0 0 8px;
+      color: var(--blue);
+      font-size: 1.4em;
+    }
+
+    textarea, input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      border: 2px solid var(--blue);
       border-radius: 8px;
       padding: 15px;
       font-family: 'Segoe UI', sans-serif;
       font-size: 14px;
+      background-color: var(--bg2);
       resize: vertical;
-      box-sizing: border-box;
-      background-color: #F0F6FF;
     }
-    textarea:focus {
+    textarea:focus, input[type="text"]:focus {
       outline: none;
-      border-color: #007ACC;
+      border-color: var(--blue2);
       box-shadow: 0 0 0 3px rgba(0, 122, 204, 0.1);
     }
-    button { 
+    textarea { min-height: 200px; }
+
+    .btn {
       width: 100%;
-      padding: 15px 20px; 
+      padding: 15px 20px;
       font-size: 18px;
       font-weight: 600;
       cursor: pointer;
       border: none;
       border-radius: 8px;
-      background: linear-gradient(135deg, #0055A4 0%, #007ACC 100%);
+      background: linear-gradient(135deg, var(--blue) 0%, var(--blue2) 100%);
       color: #fff;
       transition: all 0.3s ease;
       box-shadow: 0 4px 15px rgba(0, 85, 164, 0.3);
     }
-    button:hover { 
-      transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 85, 164, 0.4);
-    }
-    button:active {
-      transform: translateY(0);
-    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,85,164,0.4); }
+    .btn:active { transform: translateY(0); }
+
     .note {
-      background-color: #F0F6FF;
-      border: 1px solid #0055A4;
+      background-color: var(--bg2);
+      border: 1px solid var(--blue);
       border-radius: 8px;
       padding: 15px;
-      margin-top: 20px;
+      margin-top: 14px;
       font-size: 14px;
     }
-    .note strong {
-      color: #0055A4;
-    }
+    .note strong { color: var(--blue); }
+
+    .row { display: flex; gap: 10px; margin-top: 12px; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>CM360 Tag Tester</h1>
-    <p>Paste your CM360 iframe or JavaScript tag below to test pixel firing:</p>
-    <textarea id="tagInput" placeholder="Paste your CM360 tag here...
+    <p class="lead">Choose Display or VAST. Display opens the existing viewer. VAST opens a VAST-only page.</p>
+
+    <div class="grid">
+      <!-- Left window: your original Display Tag tester (unchanged behavior) -->
+      <div class="card">
+        <h2>Display Tag (CM360)</h2>
+        <p style="margin:0 0 12px">Paste your CM360 iframe or JavaScript tag below to test pixel firing:</p>
+        <textarea id="tagInput" placeholder="Paste your CM360 tag here...
 
 Example:
-<script src='https://www.googletagmanager.com/gtag/js?id=DC-XXXXXXX'></script>
+<script src='https://www.googletagservices.com/dcm/dcmads.js'></script>
+
+or
+
+<ins class='dcmads' ...><script src='https://www.googletagservices.com/dcm/dcmads.js'></script></ins>
 
 or
 
 <iframe src='https://XXXXXXX.fls.doubleclick.net/...' width='1' height='1' style='display:none'></iframe>"></textarea>
-    <button onclick="runTag()">🚀 Test Tag</button>
-    
-    <div class="note">
-      <strong>Note:</strong> This tool will load your tag and monitor for common tracking pixels including DoubleClick, Meta/Facebook, Google Ads, LiveRamp, and Connect pixels.
+
+        <div class="row">
+          <button class="btn" onclick="runTag()">🚀 Test Display Tag</button>
+        </div>
+
+        <div class="note">
+          <strong>Note:</strong> This will open <code>viewer.html?tag=…</code> and your Chrome extension will forward subframe requests so DV/LiveRamp etc. can be marked ✅.
+        </div>
+      </div>
+
+      <!-- Right window: new VAST launcher -->
+      <div class="card">
+        <h2>VAST</h2>
+        <p style="margin:0 0 12px">Enter a VAST URL (Wrapper or Inline). This will open a VAST-only viewer.</p>
+        <input id="vastUrl" type="text" placeholder="https://…/tag.vast" />
+
+        <div class="row">
+          <button class="btn" onclick="openVast()">🎬 Open VAST Viewer</button>
+        </div>
+
+        <div class="note">
+          <strong>Tip:</strong> If your VAST endpoint is blocked by CORS, we can add a “Paste XML” flow later (and a <code>vast.html</code> that accepts pasted XML). For now, URL is perfect.
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
+    /* === Left card: keep your original behavior exactly === */
     function runTag() {
       const tagValue = document.getElementById('tagInput').value.trim();
       if (!tagValue) {
@@ -118,14 +169,20 @@ or
       const tag = encodeURIComponent(tagValue);
       window.location.href = `viewer.html?tag=${tag}`;
     }
-
-    // Allow Enter key to submit (Ctrl+Enter for new line)
+    // Enter submits; Ctrl+Enter inserts newline
     document.getElementById('tagInput').addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && !e.ctrlKey) {
         e.preventDefault();
         runTag();
       }
     });
+
+    /* === Right card: simple VAST URL opener === */
+    function openVast() {
+      const url = (document.getElementById('vastUrl').value || '').trim();
+      if (!url) { alert('Please enter a VAST URL first!'); return; }
+      window.location.href = `vast.html?vastUrl=${encodeURIComponent(url)}`;
+    }
   </script>
 </body>
 </html>

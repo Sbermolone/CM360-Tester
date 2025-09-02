@@ -69,7 +69,7 @@
   </div>
 
   <script>
-    /* ===== Pixel patterns (same list you used in viewer.html) ===== */
+    /* ===== Pixel patterns ===== */
     const expectedPixels = [
       { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
       { name: "LiveRamp", patterns: ["di.rlcdn.com", "liveramp.com"] },
@@ -77,15 +77,18 @@
       { name: "Meta/Facebook", patterns: ["facebook.com/tr", "connect.facebook.net"] },
       { name: "Google Ads", patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
       { name: "DoubleVerify", patterns: ["cdn.doubleverify.com"] },
-      { name: "iSpot", patterns: ["ispot.tv/"] },
-      { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
+      { name: "iSpot", patterns: ["ispot.tv"] },
+      { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }, <!-- FIX: comma added -->
       { name: "Innovid", patterns: ["rtr.innovid.com"] }
     ];
 
-    /* ===== Minimal UI state and helpers ===== */
+    /* ===== UI state & helpers ===== */
     const pixelStatus = {};
     const networkLog = [];
-    const networkLogEl = document.getElementById('networkLog');
+    const networkLogEl   = document.getElementById('networkLog');
+    const firedCountEl   = document.getElementById('firedCount');     // robust refs (don’t rely on globals)
+    const pendingCountEl = document.getElementById('pendingCount');
+    const notFiredCountEl= document.getElementById('notFiredCount');
 
     (function initPixelList(){
       const list = document.getElementById('pixelList');
@@ -102,9 +105,9 @@
 
     function updateStats(){
       const vals = Object.values(pixelStatus);
-      firedCount.textContent    = vals.filter(s=>s==='fired').length;
-      pendingCount.textContent  = vals.filter(s=>s==='pending').length;
-      notFiredCount.textContent = vals.filter(s=>s==='not-fired').length;
+      firedCountEl.textContent     = vals.filter(s=>s==='fired').length;
+      pendingCountEl.textContent   = vals.filter(s=>s==='pending').length;
+      notFiredCountEl.textContent  = vals.filter(s=>s==='not-fired').length;
     }
     function markPixelFired(name, url){
       if (pixelStatus[name] === 'fired') return;
@@ -149,7 +152,7 @@
       networkLogEl.scrollTop = networkLogEl.scrollHeight;
     }
 
-    /* ===== VAST core: resolve wrappers, pick MediaFile, fire pings ===== */
+    /* ===== VAST core ===== */
     const MAX_HOPS = 5;
     const state = {
       impressions: [], tracking: {}, clickThrough: null, clickTracking: [],
@@ -212,27 +215,22 @@
     function applyVast(xml){
       const info = document.getElementById('vastInfo');
 
-      // Collect top-level signals
       state.impressions = ts(xml,'Impression');
       state.errorUrls  = ts(xml,'Error');
 
-      // Find a Linear creative
       const linear = xml.querySelector('InLine Creative Linear, Inline Creative Linear, InLine > Creatives > Creative > Linear, Inline > Creatives > Creative > Linear');
       if (!linear) { info.innerHTML = '<span style="color:#C9302C">No Linear creative found (VPAID/SIMID not supported here).</span>'; return; }
 
-      // Tracking events
       state.tracking = {};
       [...linear.querySelectorAll('TrackingEvents Tracking')].forEach(n=>{
         const ev=(n.getAttribute('event')||'').trim(); const u=(n.textContent||'').trim(); if (!ev||!u) return;
         (state.tracking[ev] ||= []).push(u);
       });
 
-      // Clicks
       const vc = linear.querySelector('VideoClicks');
       state.clickThrough = vc ? t(vc,'ClickThrough') : null;
       state.clickTracking = vc ? ts(vc,'ClickTracking') : [];
 
-      // Media files (mp4 pick, prefer highest bitrate)
       const files = [...linear.querySelectorAll('MediaFiles MediaFile')].map(n=>({
         url:(n.textContent||'').trim(),
         type:(n.getAttribute('type')||'').toLowerCase(),
@@ -246,11 +244,10 @@
       info.innerHTML = `<div><strong>MediaFile:</strong> ${state.media.url}</div>
                         <div class="tiny">Impressions: ${state.impressions.length} | Tracking events: ${Object.keys(state.tracking).length} | ClickThrough: ${state.clickThrough ? 'yes' : 'no'}</div>`;
 
-      // Load video and wire tracking
       const v = document.getElementById('player');
       v.src = state.media.url; v.currentTime = 0; v.playbackRate = 1;
       v.onloadedmetadata = () => logNetworkActivity(v.src,'success','[VAST] MediaFile loaded');
-      v.onerror = () => fireError(405); // generic playback error
+      v.onerror = () => fireError(405);
 
       wireVideo(v);
     }
@@ -258,7 +255,6 @@
     function wireVideo(v){
       state.fired = { imp:false, start:false, q1:false, mid:false, q3:false, complete:false };
 
-      // ClickThrough/ClickTracking
       v.onclick = () => {
         if (state.clickThrough) {
           state.clickTracking.forEach(u=>ping(u,'[ClickTracking]'));
@@ -290,7 +286,7 @@
     function replay(){ const v=document.getElementById('player'); state.fired={imp:false,start:false,q1:false,mid:false,q3:false,complete:false}; v.currentTime=0; v.play().catch(()=>{}); }
     function rate(n){ document.getElementById('player').playbackRate = n; }
 
-    /* ===== Boot: read ?vastUrl=… from index.html ===== */
+    /* ===== Boot ===== */
     (function boot(){
       const params = new URLSearchParams(location.search);
       const vastUrl = params.get('vastUrl');
@@ -302,7 +298,7 @@
       });
     })();
 
-    /* ===== Extension bridge: show [Ext] lines & flip pixels on subframe traffic ===== */
+    /* ===== Extension bridge ===== */
     (function () {
       const badge = document.createElement('div');
       badge.style.cssText = 'position:fixed;right:12px;bottom:12px;padding:6px 10px;border-radius:8px;background:#0055A4;color:#fff;font:12px/1.2 sans-serif;z-index:99999;opacity:.9';

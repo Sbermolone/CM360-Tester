@@ -96,16 +96,6 @@
     .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,85,164,0.4); }
     .btn:active { transform: translateY(0); }
 
-    .note {
-      background-color: var(--bg2);
-      border: 1px solid var(--blue);
-      border-radius: 8px;
-      padding: 15px;
-      margin-top: 14px;
-      font-size: 14px;
-    }
-    .note strong { color: var(--blue); }
-
     .row { display: flex; gap: 10px; margin-top: 12px; }
   </style>
 </head>
@@ -115,7 +105,7 @@
     <p class="lead">Choose Display or VAST. Display opens the existing viewer. VAST opens a VAST-only page.</p>
 
     <div class="grid">
-      <!-- Left window: your original Display Tag tester (unchanged behavior) -->
+      <!-- Left window: Display Tag tester -->
       <div class="card">
         <h2>Display Tag (CM360)</h2>
         <p style="margin:0 0 12px">Paste your CM360 iframe or JavaScript tag below to test pixel firing:</p>
@@ -135,31 +125,22 @@ or
         <div class="row">
           <button class="btn" onclick="runTag()">🚀 Test Display Tag</button>
         </div>
-
-        <div class="note">
-          <strong>Note:</strong> This will open <code>viewer.html?tag=…</code> and your Chrome extension will forward subframe requests so DV/LiveRamp etc. can be marked ✅.
-        </div>
       </div>
 
-      <!-- Right window: new VAST launcher -->
+      <!-- Right window: VAST launcher -->
       <div class="card">
         <h2>VAST</h2>
         <p style="margin:0 0 12px">Enter a VAST URL (Wrapper or Inline). This will open a VAST-only viewer.</p>
         <input id="vastUrl" type="text" placeholder="https://…/tag.vast" />
-
         <div class="row">
           <button class="btn" onclick="openVast()">🎬 Open VAST Viewer</button>
-        </div>
-
-        <div class="note">
-          <strong>Tip:</strong> If your VAST endpoint is blocked by CORS, we can add a “Paste XML” flow later (and a <code>vast.html</code> that accepts pasted XML). For now, URL is perfect.
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    /* === Left card: keep your original behavior exactly === */
+    /* === Display === */
     function runTag() {
       const tagValue = document.getElementById('tagInput').value.trim();
       if (!tagValue) {
@@ -177,7 +158,7 @@ or
       }
     });
 
-    /* === Right card: simple VAST URL opener === */
+    /* === VAST === */
     function openVast() {
       const url = (document.getElementById('vastUrl').value || '').trim();
       if (!url) { alert('Please enter a VAST URL first!'); return; }

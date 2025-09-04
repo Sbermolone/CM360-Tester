@@ -25,6 +25,16 @@
     .network-pixel { background-color: #FFF3E0; border: 1px solid #FF9800; }
     .clear-btn { background: none; border: 1px solid #0055A4; color: #0055A4; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-top: 10px; }
     .clear-btn:hover { background-color: #0055A4; color: #fff; }
+
+    /* ID Parser panel */
+    .id-panel { background:#fff; border:1px solid #0055A4; border-radius:8px; padding:12px; margin:20px 0; }
+    .id-grid { display:grid; grid-template-columns: 160px 1fr auto; gap: 8px 10px; align-items:center; }
+    .id-label { font-weight:600; color:#0055A4; }
+    .id-value { padding:6px 8px; background:#F0F6FF; border:1px solid #c7dcff; border-radius:6px; min-height:18px; font-family:monospace; font-size:12px; }
+    .copy-btn { border:1px solid #0055A4; background:#fff; color:#0055A4; border-radius:6px; padding:4px 8px; cursor:pointer; font-size:12px; }
+    .copy-btn:hover { background:#0055A4; color:#fff; }
+    .hint { font-size:12px; color:#555; margin-top:8px; }
+    .tiny { font-size:11px; color:#233; margin-top:8px; opacity:.8; }
   </style>
 </head>
 <body>
@@ -32,14 +42,35 @@
     <button id="backButton" onclick="goBack()">← Back to Index</button>
     <div id="creative"></div>
   </div>
+
   <div id="log">
     <h3>Pixel Tracker</h3>
     <div class="stats">
       <span class="stats-item fired-count">✅ Fired: <span id="firedCount">0</span></span>
       <span class="stats-item pending-count">⏳ Pending: <span id="pendingCount">0</span></span>
       <span class="stats-item not-fired-count">❌ Not Detected: <span id="notFiredCount">0</span></span>
+      <span class="stats-item" id="captureWindowLabel" title="Total capture timeout window">🕒 Window: 60s</span>
     </div>
-    <div id="pixelList"></div>
+
+    <!-- === ID PARSER PANEL === -->
+    <div class="id-panel">
+      <h3 style="margin-top:0">ID Parser</h3>
+      <div class="id-grid">
+        <div class="id-label">Placement ID</div>
+        <div class="id-value" id="placementIdValue"></div>
+        <button class="copy-btn" onclick="copyText('placementIdValue')">Copy</button>
+
+        <div class="id-label">Ad ID</div>
+        <div class="id-value" id="adIdValue"></div>
+        <button class="copy-btn" onclick="copyText('adIdValue')">Copy</button>
+
+        <div class="id-label">Creative ID</div>
+        <div class="id-value" id="creativeIdValue"></div>
+        <button class="copy-btn" onclick="copyText('creativeIdValue')">Copy</button>
+      </div>
+      <div class="hint">Pulled from the tag content and any observed request URLs (keys like <code>adid</code>, <code>crid</code>/<code>creative</code>, <code>placementid</code>/<code>plid</code>).</div>
+      <div class="tiny" id="idParserNotes"></div>
+    </div>
 
     <h3>Network Activity</h3>
     <button class="clear-btn" onclick="clearNetworkLog()">Clear Log</button>
@@ -63,6 +94,43 @@
     const pixelStatus = {};
     const networkLog = [];
     let networkLogElement, pixelListElement;
+
+    // === CAPTURE WINDOW / TIMEOUT (extended by +30s) ===
+    // Base 30s + extra 30s (configurable via ?extraMs=<number>)
+    const params = new URLSearchParams(window.location.search);
+    const BASE_CAPTURE_MS = 30000;
+    const EXTRA_CAPTURE_MS = Math.max(0, parseInt(params.get('extraMs') || '30000', 10) || 0);
+    const CAPTURE_TIMEOUT_MS = BASE_CAPTURE_MS + EXTRA_CAPTURE_MS; // default 60s
+    const IDLE_STOP_MS = Math.max(3000, parseInt(params.get('idleMs') || '5000', 10) || 5000);
+    // Update label
+    (function(){ const el = document.getElementById('captureWindowLabel'); if (el) el.textContent = '🕒 Window: ' + Math.round(CAPTURE_TIMEOUT_MS/1000) + 's'; })();
+
+    let finalizeTimer = null;
+    let lastEventCount = 0;
+    let lastActivityTs = Date.now();
+
+    function bumpActivity() {
+      lastEventCount++;
+      lastActivityTs = Date.now();
+    }
+
+    function startCaptureWindow(onFinalize) {
+      // Hard stop
+      finalizeTimer = setTimeout(() => {
+        try { onFinalize('timeout'); } catch(e){}
+      }, CAPTURE_TIMEOUT_MS);
+
+      // Early stop when idle (no new events for IDLE_STOP_MS)
+      (function pollIdle(){
+        const now = Date.now();
+        if (now - lastActivityTs >= IDLE_STOP_MS) {
+          clearTimeout(finalizeTimer);
+          try { onFinalize('idle'); } catch(e){}
+          return;
+        }
+        requestAnimationFrame(pollIdle);
+      })();
+    }
 
     function initializePixelTracking() {
       pixelListElement = document.getElementById("pixelList");
@@ -112,8 +180,9 @@
       logEntry.textContent = `[${timestamp}] ${description}: ${url}`;
       networkLogElement.appendChild(logEntry);
       networkLogElement.scrollTop = networkLogElement.scrollHeight;
+      bumpActivity(); // mark activity for idle detector
       // detect after logging
-      setTimeout(() => checkPixelUrl(url), 0);
+      setTimeout(() => { checkPixelUrl(url); tryParseIdsFromUrl(url); }, 0);
     }
 
     function logPixelDetection(name, url) {
@@ -124,6 +193,7 @@
       logEntry.textContent = `[${timestamp}] 🎯 ${name} PIXEL FIRED: ${url}`;
       networkLogElement.appendChild(logEntry);
       networkLogElement.scrollTop = networkLogElement.scrollHeight;
+      bumpActivity();
     }
 
     function clearNetworkLog() { networkLog.length = 0; networkLogElement.innerHTML = ''; }
@@ -153,12 +223,9 @@
     window.goBack = goBack;
 
     // ---- Child-iframe instrumentation (about:blank -> same-origin) ----
-    // Minimal hooks we inject into about:blank subframes to report network-relevant events.
     const CHILD_HOOKS_JS = `
       (function(){
         function send(kind, url, extra){ try{ parent.postMessage({kind, url, extra}, '*'); }catch(e){} }
-
-        // fetch
         const _fetch = window.fetch;
         window.fetch = function(...args){
           const u = (args[0] && args[0].url) ? args[0].url : String(args[0]);
@@ -166,8 +233,6 @@
           return _fetch.apply(this, args).then(r => { send('fetch-done', u, {status:r.status}); return r; })
                                          .catch(err => { send('fetch-error', u, {message:err && err.message}); throw err; });
         };
-
-        // XHR
         const _XHR = window.XMLHttpRequest;
         window.XMLHttpRequest = function(){
           const xhr = new _XHR(); const _open = xhr.open;
@@ -176,64 +241,34 @@
           xhr.addEventListener('error', ()=>send('xhr-error', xhr.__u||'', {}));
           return xhr;
         };
-
-        // sendBeacon
         if (navigator && navigator.sendBeacon){
           const _beacon = navigator.sendBeacon.bind(navigator);
           navigator.sendBeacon = function(url, data){ send('beacon', String(url||''), {}); return _beacon(url, data); };
         }
-
-        // appendChild + setAttribute for src/href
         const _append = Node.prototype.appendChild;
         Node.prototype.appendChild = function(ch){
           try{ if(ch && ch.tagName){ const u = ch.src || ch.href || ''; if(u) send('dom-append', u, {tag: ch.tagName}); } }catch(e){}
           return _append.call(this, ch);
         };
-
         const _setAttr = Element.prototype.setAttribute;
         Element.prototype.setAttribute = function(name, value){
           try{ if((name==='src'||name==='href') && value){ send('attr-set', String(value), {tag:this.tagName, attr:name}); } }catch(e){}
           return _setAttr.apply(this, arguments);
         };
-
-        // property setters
         try{ const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLImageElement.prototype,'src',{set(v){send('img-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
         try{ const d=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLIFrameElement.prototype,'src',{set(v){send('iframe-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
         try{ const d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLScriptElement.prototype,'src',{set(v){send('script-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
         try{ const d=Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype,'href'); if(d&&d.set) Object.defineProperty(HTMLLinkElement.prototype,'href',{set(v){send('link-href',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
-
-        // document.write URL sniff
         const _write = document.write.bind(document), _writeln = document.writeln.bind(document);
         function sniff(args){ try{ const s = Array.from(args).join(''); (s.match(/https?:\\/\\/[^"'>\\s)]+/gi)||[]).forEach(u=>send('doc-url',u,{})); }catch(e){} }
         document.write = function(){ sniff(arguments); return _write.apply(document, arguments); };
         document.writeln = function(){ sniff(arguments); return _writeln.apply(document, arguments); };
-
-        // Observe added nodes and src/href changes
-        try{
-          const mo = new MutationObserver(muts=>{
-            muts.forEach(m=>{
-              if(m.type==='attributes' && (m.attributeName==='src'||m.attributeName==='href')){
-                const n=m.target; const u=n.src||n.href||''; if(u) send('attr-change', u, {tag:n.tagName, attr:m.attributeName});
-              }
-              (m.addedNodes||[]).forEach(n=>{
-                if(n && n.tagName){
-                  const u=n.src||n.href||''; if(u) send('dom-add', u, {tag:n.tagName});
-                  if(n.querySelectorAll){ n.querySelectorAll('[src],[href]').forEach(nn=>{ const uu=nn.src||nn.href||''; if(uu) send('nested-element', uu, {tag:nn.tagName}); }); }
-                }
-              });
-            });
-          });
-          mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src','href']});
-        }catch(e){ send('mo-error','',{message:e.message}); }
-
-        // Performance entries for resources in this frame
         try{
           if('PerformanceObserver' in window){
             const po=new PerformanceObserver(list=>{ list.getEntries().forEach(ent=>{ if(ent && ent.name) send('perf-entry', ent.name, {type:ent.initiatorType}); });});
             po.observe({entryTypes:['resource']});
           }
         }catch(e){ send('perf-error','',{message:e.message}); }
-
         send('child-hooks-ready', location.href, {});
       })();
     `;
@@ -242,9 +277,7 @@
       try {
         if (!node || node.tagName !== 'IFRAME') return;
         const src = (node.getAttribute('src') || '').trim();
-        // Treat empty src / about:blank / data: as instrumentable
         if (!src || src === 'about:blank' || src.startsWith('javascript:') || src.startsWith('data:')) {
-          // Wait for the contentDocument to exist, then inject our hooks
           let tries = 0;
           (function attempt(){
             tries++;
@@ -257,10 +290,8 @@
                 logNetworkActivity('(child-frame)', 'success', 'Injected child iframe hooks');
                 return;
               }
-            } catch(e) {
-              // If navigation already occurred, we won't be able to inject
-            }
-            if (tries < 40) setTimeout(attempt, 50); // up to ~2s
+            } catch(e) {}
+            if (tries < 40) setTimeout(attempt, 50);
           })();
         }
       } catch(e) {
@@ -294,8 +325,6 @@
         <script>
           (function(){
             function send(kind, url, extra){ try{ parent.postMessage({kind, url, extra}, '*'); }catch(e){} }
-
-            // fetch
             const _fetch = window.fetch;
             window.fetch = function(...args){
               const u = (args[0] && args[0].url) ? args[0].url : String(args[0]);
@@ -303,8 +332,6 @@
               return _fetch.apply(this, args).then(r=>{ send('fetch-done', u, {status:r.status}); return r; })
                                              .catch(err=>{ send('fetch-error', u, {message:err && err.message}); throw err; });
             };
-
-            // XHR
             const _XHR = window.XMLHttpRequest;
             window.XMLHttpRequest = function(){
               const xhr = new _XHR(); const _open = xhr.open;
@@ -313,30 +340,21 @@
               xhr.addEventListener('error',()=>send('xhr-error',xhr.__u||'',{}));
               return xhr;
             };
-
-            // sendBeacon
             if (navigator && navigator.sendBeacon){
               const _b = navigator.sendBeacon.bind(navigator);
               navigator.sendBeacon = function(url, data){ send('beacon', String(url||''), {}); return _b(url, data); };
             }
-
-            // appendChild: also try to instrument about:blank child iframes we create inside this frame
             const _append = Node.prototype.appendChild;
             Node.prototype.appendChild = function(ch){
               try{
                 if(ch && ch.tagName){
                   const u = ch.src || ch.href || '';
                   if (u) send('dom-append', u, {tag: ch.tagName});
-                  if (ch.tagName === 'IFRAME') {
-                    // signal parent to instrument child
-                    send('child-iframe', u||'(blank)', {});
-                  }
+                  if (ch.tagName === 'IFRAME') { send('child-iframe', u||'(blank)', {}); }
                 }
               }catch(e){}
               return _append.call(this, ch);
             };
-
-            // Observe added nodes and src/href changes (also notify parent on iframes)
             try{
               const mo = new MutationObserver(muts=>{
                 muts.forEach(m=>{
@@ -355,27 +373,20 @@
               });
               mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src','href']});
             }catch(e){ send('mo-error','',{message:e.message}); }
-
-            // property setters for src/href
             try{ const d=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLIFrameElement.prototype,'src',{set(v){ send('iframe-src',String(v),{}); return d.set.call(this,v);},get(){return d.get.call(this);}});}catch(e){}
             try{ const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLImageElement.prototype,'src',{set(v){ send('img-src',String(v),{}); return d.set.call(this,v);},get(){return d.get.call(this);}});}catch(e){}
             try{ const d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLScriptElement.prototype,'src',{set(v){ send('script-src',String(v),{}); return d.set.call(this,v);},get(){return d.get.call(this);}});}catch(e){}
             try{ const d=Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype,'href'); if(d&&d.set) Object.defineProperty(HTMLLinkElement.prototype,'href',{set(v){ send('link-href',String(v),{}); return d.set.call(this,v);},get(){return d.get.call(this);}});}catch(e){}
-
-            // document.write sniff
             const _w = document.write.bind(document), _wl = document.writeln.bind(document);
             function sniff(args){ try{ const s=Array.from(args).join(''); (s.match(/https?:\\/\\/[^"'>\\s)]+/gi)||[]).forEach(u=>send('doc-url',u,{})); }catch(e){} }
             document.write   = function(){ sniff(arguments); return _w.apply(document, arguments); };
             document.writeln = function(){ sniff(arguments); return _wl.apply(document, arguments); };
-
-            // Performance entries
             try{
               if('PerformanceObserver' in window){
                 const po=new PerformanceObserver(list=>{ list.getEntries().forEach(ent=>{ if(ent && ent.name) send('perf-entry', ent.name, {type:ent.initiatorType});});});
                 po.observe({entryTypes:['resource']});
               }
             }catch(e){ send('perf-error','',{message:e.message}); }
-
             send('bootstrap-ready', location.href, {});
           })();
         <\/script>
@@ -397,7 +408,6 @@
       window.addEventListener('message', (evt)=>{
         const d = evt.data || {};
         if (d && d.kind === 'child-iframe') {
-          // scan current sandbox DOM for iframes and instrument blank ones
           try {
             const doc = iframe.contentDocument;
             if (!doc) return;
@@ -425,58 +435,172 @@
       const status = /error/i.test(d.kind) ? 'error' : 'success';
       logNetworkActivity(d.url || '(unknown)', status, `[Sandbox] ${labelMap[d.kind] || d.kind}`);
     });
-// === Extension bridge: receive network events across subframes ===
-(function () {
-  // Optional: small badge so you see when the extension is connected
-  const badge = document.createElement('div');
-  badge.style.cssText = 'position:fixed;right:12px;bottom:12px;padding:6px 10px;border-radius:6px;background:#0055A4;color:#fff;font:12px/1.2 sans-serif;z-index:99999;opacity:.9';
-  badge.textContent = 'Pixel Ext: waiting…';
-  document.body.appendChild(badge);
 
-  window.addEventListener('message', (evt) => {
-    const msg = evt.data;
-    if (!msg || msg.source !== 'cm360-pixel-ext') return;
+    // === Extension bridge: receive network events across subframes ===
+    (function () {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'position:fixed;right:12px;bottom:12px;padding:6px 10px;border-radius:6px;background:#0055A4;color:#fff;font:12px/1.2 sans-serif;z-index:99999;opacity:.9';
+      badge.textContent = 'Pixel Ext: waiting…';
+      document.body.appendChild(badge);
 
-    if (msg.kind === 'hello') {
-      badge.textContent = 'Pixel Ext: connected';
-      return;
+      window.addEventListener('message', (evt) => {
+        const msg = evt.data;
+        if (!msg || msg.source !== 'cm360-pixel-ext') return;
+
+        if (msg.kind === 'hello') {
+          badge.textContent = 'Pixel Ext: connected';
+          return;
+        }
+        if (msg.kind === 'net') {
+          const { url, phase, statusCode, method, type, frameId } = msg.payload || {};
+          const status = (phase === 'error' || (statusCode && statusCode >= 400)) ? 'error' : 'success';
+          const desc = `[Ext][${type || 'request'}][f:${frameId}] ${method || ''} ${phase}${statusCode ? ' (' + statusCode + ')' : ''}`;
+          logNetworkActivity(url || '(unknown)', status, desc);
+        }
+      });
+    })();
+
+    // === ID PARSER (tag + network URLs) ===
+    const idState = {
+      placementId: null,
+      adId: null,
+      creativeId: null,
+      notes: []
+    };
+
+    function setIdValue(elId, val) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.textContent = val || '';
     }
 
-    if (msg.kind === 'net') {
-      // Normalize into your existing logger/detector
-      const { url, phase, statusCode, method, type, frameId } = msg.payload || {};
-      const status = (phase === 'error' || (statusCode && statusCode >= 400)) ? 'error' : 'success';
-      const desc = `[Ext][${type || 'request'}][f:${frameId}] ${method || ''} ${phase}${statusCode ? ' (' + statusCode + ')' : ''}`;
-      logNetworkActivity(url || '(unknown)', status, desc);
+    function copyText(elId) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const txt = el.textContent || '';
+      if (!txt) return;
+      navigator.clipboard?.writeText(txt);
     }
-  });
-})();
+    window.copyText = copyText;
+
+    function note(msg) { idState.notes.push(msg); renderIdNotes(); }
+    function renderIdNotes() {
+      const el = document.getElementById('idParserNotes');
+      if (!el) return;
+      el.innerHTML = idState.notes.map(n => `• ${n}`).join('<br>');
+    }
+
+    function tryAssign(targetKey, val, reason) {
+      if (!val) return;
+      if (!idState[targetKey]) {
+        idState[targetKey] = val;
+        note(`${targetKey} = ${val} (${reason})`);
+        if (targetKey === 'placementId') setIdValue('placementIdValue', val);
+        if (targetKey === 'adId') setIdValue('adIdValue', val);
+        if (targetKey === 'creativeId') setIdValue('creativeIdValue', val);
+      }
+    }
+
+    function parseQuery(url) {
+      try { const u = new URL(url, location.href); return Object.fromEntries(u.searchParams.entries()); }
+      catch { return {}; }
+    }
+
+    // Heuristics: CM360 often exposes ad/creative/placement via params like
+    // adid, ad, ad_id | crid, creative, creativeid | placementid, plid
+    function extractIdsFromUrl(url) {
+      const q = parseQuery(url);
+      const keys = Object.keys(q).reduce((acc, k) => { acc[k.toLowerCase()] = q[k]; return acc; }, {});
+      const get = (...names) => {
+        for (const n of names) { if (keys[n] && String(keys[n]).trim()) return String(keys[n]).trim(); }
+        return null;
+      };
+      const ad = get('adid','ad','ad_id');
+      const cr = get('crid','creative','creativeid','cid');
+      const pl = get('placementid','plid','placement','plc');
+      return { ad, cr, pl };
+    }
+
+    // Try to sniff a numeric-looking ID from text (e.g., "Placement ID: 426439465")
+    function sniffNumericIdFromText(s, labelRx) {
+      const rx = new RegExp(labelRx + '\\s*[:=]\\s*(\\d{5,})','i');
+      const m = s.match(rx);
+      return m ? m[1] : null;
+    }
+
+    // Fallback: find long numeric tokens that look ID-ish
+    function sniffAnyIdNumbers(s, minLen = 7) {
+      const out = [];
+      (s.match(/(^|[^0-9])(\\d{7,})(?![0-9])/g) || []).forEach(tok => {
+        const n = tok.replace(/\\D/g,'');
+        if (n && n.length >= minLen) out.push(n);
+      });
+      return out;
+    }
+
+    function tryParseIdsFromRawTag(tagContent) {
+      // Direct label-based
+      tryAssign('placementId', sniffNumericIdFromText(tagContent, 'placement\\s*id'), 'raw tag text');
+      tryAssign('adId', sniffNumericIdFromText(tagContent, 'ad\\s*id'), 'raw tag text');
+      tryAssign('creativeId', sniffNumericIdFromText(tagContent, 'creative\\s*id'), 'raw tag text');
+
+      // URL param-based inside the tag
+      const urls = tagContent.match(/https?:\\/\\/[^"'>\\s)]+/gi) || [];
+      urls.forEach(u => {
+        const { ad, cr, pl } = extractIdsFromUrl(u);
+        tryAssign('adId', ad, `URL param in tag (${u})`);
+        tryAssign('creativeId', cr, `URL param in tag (${u})`);
+        tryAssign('placementId', pl, `URL param in tag (${u})`);
+      });
+
+      // As last resort, use any big numbers if nothing else hit
+      if (!idState.placementId || !idState.adId || !idState.creativeId) {
+        const bigs = sniffAnyIdNumbers(tagContent);
+        if (bigs.length) note(`Found numeric tokens in tag: ${bigs.slice(0,3).join(', ')}…`);
+      }
+    }
+
+    function tryParseIdsFromUrl(u) {
+      if (!u || u === '(unknown)' || u === '(none)') return;
+      const { ad, cr, pl } = extractIdsFromUrl(u);
+      tryAssign('adId', ad, `URL param (${u})`);
+      tryAssign('creativeId', cr, `URL param (${u})`);
+      tryAssign('placementId', pl, `URL param (${u})`);
+    }
 
     // ---- Boot ----
     initializePixelTracking();
-    const params = new URLSearchParams(window.location.search);
     const rawTag = decodeURIComponent(params.get("tag") || "");
     const header = document.createElement('div');
     header.style.cssText = 'background:#E6F0FA;border:1px solid #0055A4;padding:12px;border-radius:6px;margin-bottom:15px;font-weight:600;';
     header.textContent = params.get("tag") ? '✅ Tag parameter detected - initializing sandbox...' : '❌ No tag parameter found in URL.';
     document.getElementById("creative").appendChild(header);
 
+    // Start capture window and finalize logic
+    function finalizeCapture(reason) {
+      // Flip any still-pending pixels to not-fired
+      expectedPixels.forEach(pixel => {
+        if (pixelStatus[pixel.name] === 'pending') {
+          pixelStatus[pixel.name] = 'not-fired';
+          const el = document.getElementById(`pixel-${pixel.name.replace(/[^a-zA-Z0-9]/g, '')}`);
+          if (el) { el.className = "pixel-check not-fired"; el.textContent = `❌ ${pixel.name}: Timeout (no activity detected)`; }
+        }
+      });
+      updateStats();
+      logNetworkActivity('finalize', reason === 'idle' ? 'success' : 'error', reason === 'idle' ? 'Capture ended (idle)' : 'Capture ended (timeout)');
+    }
+
     if (rawTag && rawTag.trim()) {
       expectedPixels.forEach(p => markPixelPending(p.name)); // pending immediately
+
+      // Parse IDs from the raw tag before running
+      tryParseIdsFromRawTag(rawTag);
+
+      // Run sandbox
       runTagInSandbox(rawTag);
 
-      // Fallback timeout
-      setTimeout(() => {
-        expectedPixels.forEach(pixel => {
-          if (pixelStatus[pixel.name] === 'pending') {
-            pixelStatus[pixel.name] = 'not-fired';
-            const el = document.getElementById(`pixel-${pixel.name.replace(/[^a-zA-Z0-9]/g, '')}`);
-            if (el) { el.className = "pixel-check not-fired"; el.textContent = `❌ ${pixel.name}: Timeout (no activity detected)`; }
-          }
-        });
-        updateStats();
-        logNetworkActivity('timeout','error','Pixel detection timeout reached');
-      }, 12000);
+      // Start extended capture window (defaults to 60s; override with ?extraMs=…)
+      startCaptureWindow(finalizeCapture);
     } else {
       document.getElementById("creative").innerHTML += "<p style='color:#C9302C; text-align:center; padding:20px;'>❌ No tag content received or tag is empty.</p>";
     }

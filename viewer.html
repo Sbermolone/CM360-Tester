@@ -194,6 +194,43 @@
       if (cr && !idState.creativeId)  { idState.creativeId  = cr; setIdValue('creativeIdValue', cr);  noteId(`Creative ID from ${shorten(url)}`); }
     }
 
+    // === Creative sandbox loader (RESTORED) ===
+    function runTagInSandbox(tagContent) {
+      const creativeDiv = document.getElementById("creative");
+
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'border:2px dashed #0055A4;padding:10px;margin-top:10px;border-radius:8px;';
+      wrapper.innerHTML = '<strong>CM360 Creative Sandbox:</strong><br><br>';
+      creativeDiv.appendChild(wrapper);
+
+      const iframe = document.createElement('iframe');
+      iframe.sandbox = 'allow-scripts allow-same-origin allow-forms allow-popups';
+      iframe.style.width = '300px';
+      iframe.style.height = '250px';
+      iframe.style.border = '1px solid #ccc';
+      wrapper.appendChild(iframe);
+
+      // Load the tag content inside the iframe
+      iframe.srcdoc = `
+        <!doctype html>
+        <html>
+          <head><meta charset="utf-8"></head>
+          <body>${tagContent}</body>
+        </html>
+      `;
+
+      iframe.onload  = () => {
+        logNetworkActivity('sandbox','success','Sandbox iframe loaded');
+        wrapper.style.border='2px solid #4CAF50';
+        wrapper.querySelector('strong').textContent='CM360 Creative Sandbox (Loaded):';
+      };
+      iframe.onerror = () => {
+        logNetworkActivity('sandbox','error','Sandbox iframe failed to load');
+        wrapper.style.border='2px solid #F44336';
+        wrapper.querySelector('strong').textContent='CM360 Creative Sandbox (Error):';
+      };
+    }
+
     // ---- Boot (unchanged except for parser pre-seed optional) ----
     initializePixelTracking();
     const params = new URLSearchParams(window.location.search);

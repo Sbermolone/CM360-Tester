@@ -171,7 +171,7 @@
     }
 
     function goBack() { window.location.href = "index.html"; }
-    window.goBack = goBack;
+    window.goBack = goBack; // ensure onclick works
 
     // === Minimal ID Parser (deep) ===
     const idState = { placementId: null, adId: null, creativeId: null };
@@ -182,7 +182,7 @@
     function noteId(msg){ const el=document.getElementById('idParserNotes'); if(!el) return; el.innerHTML += (el.innerHTML ? '<br>' : '') + '• ' + msg; }
     function shorten(u){ try{ const x=new URL(u, location.href); return x.hostname + x.pathname.slice(0,40); }catch{ return String(u).slice(0,60); } }
     function decodeNested(s, times=3){ let out=String(s); for(let i=0;i<times;i++){ try{ const dec=decodeURIComponent(out); if(dec===out) break; out=dec; }catch{ break; } } return out; }
-    function pickId(rx, str){ const m = rx.exec(str); return m ? (m[2] || m[1]) : null; }
+    function pickId(rx, str){ const m = rx.exec(str); return m ? m[1] : null; } // single capture
 
     // helper to pick first non-empty value from a set of keys
     function getFirst(obj, keys) {
@@ -203,7 +203,7 @@
     }
 
     function updateIdsFromUrl(url) {
-      if (!url || url === '(unknown)' || url === '(none)')) return;
+      if (!url || url === '(unknown)' || url === '(none)') return; // ✅ fixed (no stray ')')
       const q = parseQuery(url);
       const k = Object.fromEntries(Object.entries(q).map(([a,b]) => [a.toLowerCase(), String(b)]));
 

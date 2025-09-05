@@ -66,15 +66,15 @@
   </div>
 
   <script>
-    // ---- Expected pixels list ----
+    // ---- Expected pixels list (domain-level) ----
     const expectedPixels = [
       { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
       { name: "LiveRamp",         patterns: ["di.rlcdn.com", "liveramp.com"] },
       { name: "Connect",          patterns: ["hrzn-nxt.com", "horizon-nxt.com"] },
       { name: "Meta/Facebook",    patterns: ["facebook.com/tr", "connect.facebook.net"] },
       { name: "Google Ads",       patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
-      { name: "DoubleVerify",     patterns: ["doubleverify.com"] }, // domain-level
-      { name: "iSpot",            patterns: ["ispot.tv"] },         // domain-level
+      { name: "DoubleVerify",     patterns: ["doubleverify.com"] },
+      { name: "iSpot",            patterns: ["ispot.tv"] },
       { name: "Generic Pixel",    patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
     ];
 
@@ -183,25 +183,41 @@
     function shorten(u){ try{ const x=new URL(u, location.href); return x.hostname + x.pathname.slice(0,40); }catch{ return String(u).slice(0,60); } }
     function decodeNested(s, times=3){ let out=String(s); for(let i=0;i<times;i++){ try{ const dec=decodeURIComponent(out); if(dec===out) break; out=dec; }catch{ break; } } return out; }
     function pickId(rx, str){ const m = rx.exec(str); return m ? (m[2] || m[1]) : null; }
+
+    // helper to pick first non-empty value from a set of keys
+    function getFirst(obj, keys) {
+      for (const k of keys) {
+        if (obj[k] != null && String(obj[k]).trim() !== '') return String(obj[k]).trim();
+      }
+      return null;
+    }
+
     function updateIdsFromString(str, srcLabel){
       const s = decodeNested(str, 3);
-      const ad = pickId(/(?:\b|_|%|\/)(?:adid|ad_id|ad)[\s=:]*([0-9]{5,})/i, s);
-      const cr = pickId(/(?:\b|_|%|\/)(?:crid|creativeid|creative|cid)[\s=:]*([0-9]{5,})/i, s);
-      const pl = pickId(/(?:\b|_|%|\/)(?:placementid|placement|plid|plc)[\s=:]*([0-9]{5,})/i, s);
+      const ad = pickId(/(?:^|[?&#_/:%])(?:adid|ad_id|aid|dc_trk_aid|btreg|placementtype)\s*=\s*([0-9]{5,})/i, s);
+      const cr = pickId(/(?:^|[?&#_/:%])(?:crid|creativeid|creative|cid|crt)\s*=\s*([0-9]{5,})/i, s);
+      const pl = pickId(/(?:^|[?&#_/:%])(?:placementid|placement|plid|plc)\s*=\s*([0-9]{5,})/i, s);
       if (pl && !idState.placementId){ idState.placementId=pl; setIdValue('placementIdValue', pl); noteId(`Placement ID from ${srcLabel}`); }
-      if (ad && !idState.adId){ idState.adId=ad; setIdValue('adIdValue', ad); noteId(`Ad ID from ${srcLabel}`); }
-      if (cr && !idState.creativeId){ idState.creativeId=cr; setIdValue('creativeIdValue', cr); noteId(`Creative ID from ${srcLabel}`); }
+      if (ad && !idState.adId){        idState.adId=ad;       setIdValue('adIdValue', ad);       noteId(`Ad ID from ${srcLabel}`); }
+      if (cr && !idState.creativeId){  idState.creativeId=cr; setIdValue('creativeIdValue', cr); noteId(`Creative ID from ${srcLabel}`); }
     }
+
     function updateIdsFromUrl(url) {
-      if (!url || url === '(unknown)' || url === '(none)') return;
+      if (!url || url === '(unknown)' || url === '(none)')) return;
       const q = parseQuery(url);
       const k = Object.fromEntries(Object.entries(q).map(([a,b]) => [a.toLowerCase(), String(b)]));
-      const pl = k.placementid || k.plid || k.placement || null;
-      const ad = k.adid || k.ad || k.ad_id || null;
-      const cr = k.crid || k.creative || k.creativeid || k.cid || null;
+
+      // placement (incl. DV plc)
+      const pl = getFirst(k, ['placementid', 'plid', 'placement', 'plc']);
+      // ad (incl. DV btreg, iSpot placementtype)
+      const ad = getFirst(k, ['adid', 'ad_id', 'aid', 'dc_trk_aid', 'btreg', 'placementtype']);
+      // creative (incl. DV crt)
+      const cr = getFirst(k, ['crid', 'creativeid', 'creative', 'cid', 'crt']);
+
       if (pl && !idState.placementId){ idState.placementId=pl; setIdValue('placementIdValue', pl); noteId(`Placement ID from ${shorten(url)}`); }
-      if (ad && !idState.adId){ idState.adId=ad; setIdValue('adIdValue', ad); noteId(`Ad ID from ${shorten(url)}`); }
-      if (cr && !idState.creativeId){ idState.creativeId=cr; setIdValue('creativeIdValue', cr); noteId(`Creative ID from ${shorten(url)}`); }
+      if (ad && !idState.adId){        idState.adId=ad;       setIdValue('adIdValue', ad);       noteId(`Ad ID from ${shorten(url)}`); }
+      if (cr && !idState.creativeId){  idState.creativeId=cr; setIdValue('creativeIdValue', cr); noteId(`Creative ID from ${shorten(url)}`); }
+
       if (!idState.placementId || !idState.adId || !idState.creativeId) { updateIdsFromString(url, shorten(url)); }
     }
 
@@ -273,7 +289,6 @@
           try{
             if (!frame || frame.tagName !== 'IFRAME') return;
             const initialSrc = (frame.getAttribute('src')||'').trim();
-            // Only try to inject when it's blank-ish so we're same-origin
             if (initialSrc && initialSrc !== 'about:blank' && !initialSrc.startsWith('javascript:') && !initialSrc.startsWith('data:')) return;
 
             let tries = 0, max = 40; // ~2s @ 50ms
@@ -286,7 +301,7 @@
                   s.textContent = '(' + hookWindow.toString() + ')();';
                   d.documentElement.appendChild(s);
                   send('child-hooks-ready', initialSrc || '(about:blank)', {});
-                  return; // success
+                  return;
                 }
               }catch(_){}
               if (tries < max) setTimeout(attempt, 50);
@@ -294,7 +309,7 @@
           }catch(_){}
         }
 
-        // Patch appendChild / setAttribute so we inject the moment iframes appear or get a src
+        // Patch appendChild / setAttribute so we inject as soon as iframes appear or change
         try{
           const _append = Node.prototype.appendChild;
           Node.prototype.appendChild = function(child){
@@ -383,7 +398,7 @@
 
       runTagInSandbox(rawTag);
 
-      // 12s timeout (unchanged)
+      // 12s timeout
       setTimeout(() => {
         expectedPixels.forEach(pixel => {
           if (pixelStatus[pixel.name] === 'pending') {

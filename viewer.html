@@ -66,15 +66,15 @@
   </div>
 
   <script>
-    // ---- Expected pixels list (tuned) ----
+    // ---- Expected pixels list ----
     const expectedPixels = [
       { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
       { name: "LiveRamp",         patterns: ["di.rlcdn.com", "liveramp.com"] },
       { name: "Connect",          patterns: ["hrzn-nxt.com", "horizon-nxt.com"] },
       { name: "Meta/Facebook",    patterns: ["facebook.com/tr", "connect.facebook.net"] },
       { name: "Google Ads",       patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
-      { name: "DoubleVerify",     patterns: ["doubleverify.com"] }, // matches cdn/tps/etc subdomains
-      { name: "iSpot",            patterns: ["ispot.tv"] },         // matches pi.ispot.tv, r.ispot.tv, etc.
+      { name: "DoubleVerify",     patterns: ["doubleverify.com"] }, // domain-level
+      { name: "iSpot",            patterns: ["ispot.tv"] },         // domain-level
       { name: "Generic Pixel",    patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
     ];
 
@@ -149,7 +149,7 @@
 
     function clearNetworkLog() { networkLog.length = 0; networkLogElement.innerHTML = ''; }
 
-    // ---- Smarter matching ----
+    // ---- Hostname-aware matcher ----
     function checkPixelUrl(url) {
       if (!url || typeof url !== 'string') return;
       let full = "", host = "";
@@ -161,10 +161,10 @@
       expectedPixels.forEach(pixel => {
         const hit = pixel.patterns.some(pat => {
           const p = String(pat).toLowerCase().trim();
-          if (p.includes(".") && !p.startsWith("/") && host) { // domain-like
+          if (p.includes(".") && !p.startsWith("/") && host) {
             if (host === p || host.endsWith("." + p)) return true;
           }
-          return full.includes(p); // substring fallback
+          return full.includes(p);
         });
         if (hit) markPixelFired(pixel.name, url);
       });
@@ -205,7 +205,7 @@
       if (!idState.placementId || !idState.adId || !idState.creativeId) { updateIdsFromString(url, shorten(url)); }
     }
 
-    // === Creative sandbox loader with safe child-iframe instrumentation ===
+    // === Creative sandbox loader with robust child-iframe instrumentation ===
     function runTagInSandbox(tagContent) {
       const creativeDiv = document.getElementById("creative");
       const wrapper = document.createElement('div');
@@ -218,7 +218,6 @@
       iframe.style.width = '300px'; iframe.style.height = '250px'; iframe.style.border = '1px solid #ccc';
       wrapper.appendChild(iframe);
 
-      // Hook function that we inject into the sandbox (and into about:blank child iframes)
       function hookWindow() {
         function send(kind, url, extra){ try{ top.postMessage({kind, url, extra}, '*'); }catch(e){} }
 
@@ -252,7 +251,7 @@
         try{ const d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLScriptElement.prototype,'src',{set(v){send('script-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
         try{ const d=Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype,'href'); if(d&&d.set) Object.defineProperty(HTMLLinkElement.prototype,'href',{set(v){send('link-href',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
 
-        // Perf observer + FLUSH existing entries so fast pixels are captured
+        // Perf observer + FLUSH existing entries
         try{
           if('PerformanceObserver' in window){
             const po=new PerformanceObserver(list=>{
@@ -269,21 +268,49 @@
           }
         }catch(e){ send('perf-error','',{message:e.message}); }
 
-        // instrument about:blank child iframes ASAP
+        // --- Robust about:blank child-iframe instrumentation ---
         function injectChildHooks(frame){
           try{
             if (!frame || frame.tagName !== 'IFRAME') return;
-            const src = (frame.getAttribute('src')||'').trim();
-            if (src && src !== 'about:blank' && !src.startsWith('javascript:') && !src.startsWith('data:')) return;
-            const d = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
-            if (d && d.documentElement){
-              const s = d.createElement('script');
-              s.textContent = '(' + hookWindow.toString() + ')();';
-              d.documentElement.appendChild(s);
-              send('child-hooks-ready', src || '(about:blank)', {});
-            }
+            const initialSrc = (frame.getAttribute('src')||'').trim();
+            // Only try to inject when it's blank-ish so we're same-origin
+            if (initialSrc && initialSrc !== 'about:blank' && !initialSrc.startsWith('javascript:') && !initialSrc.startsWith('data:')) return;
+
+            let tries = 0, max = 40; // ~2s @ 50ms
+            (function attempt(){
+              tries++;
+              try{
+                const d = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+                if (d && d.documentElement){
+                  const s = d.createElement('script');
+                  s.textContent = '(' + hookWindow.toString() + ')();';
+                  d.documentElement.appendChild(s);
+                  send('child-hooks-ready', initialSrc || '(about:blank)', {});
+                  return; // success
+                }
+              }catch(_){}
+              if (tries < max) setTimeout(attempt, 50);
+            })();
           }catch(_){}
         }
+
+        // Patch appendChild / setAttribute so we inject the moment iframes appear or get a src
+        try{
+          const _append = Node.prototype.appendChild;
+          Node.prototype.appendChild = function(child){
+            try{ if(child && child.tagName==='IFRAME') injectChildHooks(child); }catch(_){}
+            return _append.call(this, child);
+          };
+        }catch(_){}
+        try{
+          const _setAttr = Element.prototype.setAttribute;
+          Element.prototype.setAttribute = function(name, value){
+            try{ if(this && this.tagName==='IFRAME' && name==='src') injectChildHooks(this); }catch(_){}
+            return _setAttr.apply(this, arguments);
+          };
+        }catch(_){}
+
+        // Also observe DOM for iframes or src changes
         try{
           const mo = new MutationObserver(muts=>{
             muts.forEach(m=>{

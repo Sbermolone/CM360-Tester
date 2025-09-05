@@ -171,7 +171,7 @@
     }
 
     function goBack() { window.location.href = "index.html"; }
-    window.goBack = goBack; // ensure onclick works
+    window.goBack = goBack;
 
     // === Minimal ID Parser (deep) ===
     const idState = { placementId: null, adId: null, creativeId: null };
@@ -182,9 +182,8 @@
     function noteId(msg){ const el=document.getElementById('idParserNotes'); if(!el) return; el.innerHTML += (el.innerHTML ? '<br>' : '') + '• ' + msg; }
     function shorten(u){ try{ const x=new URL(u, location.href); return x.hostname + x.pathname.slice(0,40); }catch{ return String(u).slice(0,60); } }
     function decodeNested(s, times=3){ let out=String(s); for(let i=0;i<times;i++){ try{ const dec=decodeURIComponent(out); if(dec===out) break; out=dec; }catch{ break; } } return out; }
-    function pickId(rx, str){ const m = rx.exec(str); return m ? m[1] : null; } // single capture
+    function pickId(rx, str){ const m = rx.exec(str); return m ? m[1] : null; }
 
-    // helper to pick first non-empty value from a set of keys
     function getFirst(obj, keys) {
       for (const k of keys) {
         if (obj[k] != null && String(obj[k]).trim() !== '') return String(obj[k]).trim();
@@ -203,7 +202,7 @@
     }
 
     function updateIdsFromUrl(url) {
-      if (!url || url === '(unknown)' || url === '(none)') return; // ✅ fixed (no stray ')')
+      if (!url || url === '(unknown)' || url === '(none)') return;
       const q = parseQuery(url);
       const k = Object.fromEntries(Object.entries(q).map(([a,b]) => [a.toLowerCase(), String(b)]));
 
@@ -262,10 +261,17 @@
           navigator.sendBeacon = function(url, data){ send('beacon', String(url||''), {}); return _b(url, data); };
         }
 
-        // property setters (img/script/link)
+        // property setters (img/script/link/iframe)
         try{ const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLImageElement.prototype,'src',{set(v){send('img-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
         try{ const d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLScriptElement.prototype,'src',{set(v){send('script-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
         try{ const d=Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype,'href'); if(d&&d.set) Object.defineProperty(HTMLLinkElement.prototype,'href',{set(v){send('link-href',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
+        try{ const d=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLIFrameElement.prototype,'src',{set(v){send('iframe-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
+
+        // document.write sniff (legacy loaders)
+        const _w = document.write.bind(document), _wl = document.writeln.bind(document);
+        function sniff(args){ try{ const s = Array.from(args).join(''); (s.match(/https?:\/\/[^"'>\s)]+/gi)||[]).forEach(u=>send('doc-url',u,{})); }catch(e){} }
+        document.write   = function(){ sniff(arguments); return _w.apply(document, arguments); };
+        document.writeln = function(){ sniff(arguments); return _wl.apply(document, arguments); };
 
         // Perf observer + FLUSH existing entries
         try{
@@ -341,10 +347,11 @@
 
       const bootstrapScript = '(' + hookWindow.toString() + ')();';
 
-      iframe.srcdoc = '<!doctype html><html><head><meta charset="utf-8"></head><body>'
-                    + '<script>' + bootstrapScript.replace(/<\/script/gi, '<\\/script') + '<\/script>'
-                    + '<div id="tag-container">' + tagContent + '</div>'
-                    + '</body></html>';
+      iframe.srcdoc =
+        '<!doctype html><html><head><meta charset="utf-8"></head><body>'
+        + '<script>' + bootstrapScript.replace(/<\/script/gi, '<\\/script') + '<\/script>'
+        + '<div id="tag-container">' + tagContent + '</div>'
+        + '</body></html>';
 
       iframe.onload  = () => { logNetworkActivity('sandbox','success','Sandbox iframe loaded'); wrapper.style.border='2px solid #4CAF50'; wrapper.querySelector('strong').textContent='CM360 Creative Sandbox (Loaded):'; };
       iframe.onerror = () => { logNetworkActivity('sandbox','error','Sandbox iframe failed to load'); wrapper.style.border='2px solid #F44336'; wrapper.querySelector('strong').textContent='CM360 Creative Sandbox (Error):'; };
@@ -369,6 +376,8 @@
           'img-src':'Image src set',
           'script-src':'Script src set',
           'link-href':'Link href set',
+          'iframe-src':'Iframe src set',
+          'doc-url':'URL found in document.write',
           'perf-entry':'Resource performance entry',
           'perf-error':'PerformanceObserver error',
           'mo-error':'MutationObserver error'
@@ -381,24 +390,49 @@
     // ---- Boot ----
     initializePixelTracking();
     const params = new URLSearchParams(window.location.search);
-    const rawTag = decodeURIComponent(params.get("tag") || "");
+    const rawParam = params.get("tag") || "";
+    const forceScript = params.get("forceScript") === "1";
+
+    // Decode once for safety (the viewer expects a single-encoded tag)
+    const rawTag = decodeURIComponent(rawParam);
+
     const header = document.createElement('div');
     header.style.cssText = 'background:#E6F0FA;border:1px solid #0055A4;padding:12px;border-radius:6px;margin-bottom:15px;font-weight:600;';
-    header.textContent = params.get("tag") ? '✅ Tag parameter detected - initializing sandbox...' : '❌ No tag parameter found in URL.';
+    header.textContent = rawTag ? (forceScript ? '✅ Tag detected — forcing script mode…' : '✅ Tag parameter detected — initializing sandbox…') : '❌ No tag parameter found in URL.';
     document.getElementById("creative").appendChild(header);
+
+    // Optional: rewrite the tag to script rendering mode for better visibility into child requests
+    function rewriteToScriptMode(tagHtml){
+      try{
+        let t = String(tagHtml);
+        // normalize quotes for the attribute check
+        t = t.replace(/data-dcm-rendering-mode\s*=\s*(['"])iframe\1/i, "data-dcm-rendering-mode='script'");
+        // If attribute is missing, add it to the <ins ...>
+        if (!/data-dcm-rendering-mode\s*=/.test(t)) {
+          t = t.replace(/<ins\b([^>]*)>/i, "<ins$1 data-dcm-rendering-mode='script'>");
+        }
+        return t;
+      }catch{ return tagHtml; }
+    }
 
     if (rawTag && rawTag.trim()) {
       expectedPixels.forEach(p => markPixelPending(p.name));
 
+      let tagForSandbox = rawTag;
+      if (forceScript) {
+        tagForSandbox = rewriteToScriptMode(tagForSandbox);
+        logNetworkActivity('(rewrite)', 'success', 'Forcing data-dcm-rendering-mode=script');
+      }
+
       // Pre-seed IDs from URLs found in the raw tag (best-effort)
       try {
-        const urlsInTag = (rawTag.match(/https?:\/\/[^"'>\s)]+/gi) || []).slice(0, 30);
+        const urlsInTag = (tagForSandbox.match(/https?:\/\/[^"'>\s)]+/gi) || []).slice(0, 30);
         urlsInTag.forEach(u => updateIdsFromUrl(u));
       } catch (_) {}
 
-      runTagInSandbox(rawTag);
+      runTagInSandbox(tagForSandbox);
 
-      // 12s timeout
+      // 42s timeout (12s + 30s as requested)
       setTimeout(() => {
         expectedPixels.forEach(pixel => {
           if (pixelStatus[pixel.name] === 'pending') {
@@ -408,8 +442,8 @@
           }
         });
         updateStats();
-        logNetworkActivity('timeout','error','Pixel detection timeout reached');
-      }, 12000);
+        logNetworkActivity('timeout','error','Pixel detection timeout (42s) reached');
+      }, 42000);
     } else {
       document.getElementById("creative").innerHTML += "<p style='color:#C9302C; text-align:center; padding:20px;'>❌ No tag content received or tag is empty.</p>";
     }

@@ -66,19 +66,20 @@
   </div>
 
   <script>
-    // ---- Expected pixels list (unchanged) ----
+    // ---- Expected pixels list ----
+    // (Kept as-is; feel free to add patterns like 'tps.doubleverify.com' or 'r.ispot.tv' if needed)
     const expectedPixels = [
       { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
       { name: "LiveRamp", patterns: ["di.rlcdn.com", "liveramp.com"] },
       { name: "Connect", patterns: ["hrzn-nxt.com", "horizon-nxt.com"] },
       { name: "Meta/Facebook", patterns: ["facebook.com/tr", "connect.facebook.net"] },
       { name: "Google Ads", patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
-      { name: "DoubleVerify", patterns: ["cdn.doubleverify.com"] },
-      { name: "iSpot", patterns: ["ispot.tv/"] },
+      { name: "DoubleVerify", patterns: ["cdn.doubleverify.com"] },  // add 'tps.doubleverify.com' if needed
+      { name: "iSpot", patterns: ["ispot.tv/"] },                    // add 'r.ispot.tv' if needed
       { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
     ];
 
-    // ---- Pixel status helpers (unchanged) ----
+    // ---- Pixel status helpers ----
     const pixelStatus = {};
     const networkLog = [];
     let networkLogElement, pixelListElement;
@@ -131,10 +132,9 @@
       logEntry.textContent = `[${timestamp}] ${description}: ${url}`;
       networkLogElement.appendChild(logEntry);
       networkLogElement.scrollTop = networkLogElement.scrollHeight;
-      // detect after logging
-      setTimeout(() => checkPixelUrl(url), 0);
 
-      // --- NEW: ID parser hook ---
+      // detect & parse after logging
+      setTimeout(() => checkPixelUrl(url), 0);
       updateIdsFromUrl(url);
     }
 
@@ -150,7 +150,7 @@
 
     function clearNetworkLog() { networkLog.length = 0; networkLogElement.innerHTML = ''; }
 
-    // ---- Pixel URL matcher (unchanged) ----
+    // ---- Pixel URL matcher ----
     function checkPixelUrl(url) {
       if (!url || typeof url !== 'string') return;
       let full = "", host = "";
@@ -174,27 +174,67 @@
     function goBack() { window.location.href = "index.html"; }
     window.goBack = goBack;
 
-    // === Minimal ID Parser ===
+    // === Minimal ID Parser (deep) ===
     const idState = { placementId: null, adId: null, creativeId: null };
+
     function setIdValue(elId, val){ const el=document.getElementById(elId); if(el) el.textContent = val || ''; }
     function copyText(elId){ const el=document.getElementById(elId); const txt=el?.textContent?.trim(); if(txt) navigator.clipboard?.writeText(txt); }
     window.copyText = copyText;
+
     function parseQuery(url) { try { const u = new URL(url, location.href); return Object.fromEntries(u.searchParams.entries()); } catch { return {}; } }
     function noteId(msg){ const el=document.getElementById('idParserNotes'); if(!el) return; el.innerHTML += (el.innerHTML ? '<br>' : '') + '• ' + msg; }
     function shorten(u){ try{ const x=new URL(u, location.href); return x.hostname + x.pathname.slice(0,40); }catch{ return String(u).slice(0,60); } }
+
+    function decodeNested(s, times=3){
+      let out = String(s);
+      for (let i=0; i<times; i++){
+        try {
+          const dec = decodeURIComponent(out);
+          if (dec === out) break;
+          out = dec;
+        } catch { break; }
+      }
+      return out;
+    }
+
+    function pickId(rx, str){
+      const m = rx.exec(str);
+      return m ? m[2] || m[1] : null;
+    }
+
+    function updateIdsFromString(str, sourceLabel){
+      const s = decodeNested(str, 3);
+      const ad = pickId(/(?:\b|_|%|\/)(?:adid|ad_id|ad)\s*[=:]\s*(\d{5,})/i, s);
+      const cr = pickId(/(?:\b|_|%|\/)(?:crid|creativeid|creative|cid)\s*[=:]\s*(\d{5,})/i, s);
+      const pl = pickId(/(?:\b|_|%|\/)(?:placementid|placement|plid|plc)\s*[=:]\s*(\d{5,})/i, s);
+
+      if (pl && !idState.placementId) { idState.placementId = pl; setIdValue('placementIdValue', pl); noteId(`Placement ID from ${sourceLabel}`); }
+      if (ad && !idState.adId)        { idState.adId        = ad; setIdValue('adIdValue', ad);       noteId(`Ad ID from ${sourceLabel}`); }
+      if (cr && !idState.creativeId)  { idState.creativeId  = cr; setIdValue('creativeIdValue', cr);  noteId(`Creative ID from ${sourceLabel}`); }
+    }
+
     function updateIdsFromUrl(url) {
       if (!url || url === '(unknown)' || url === '(none)') return;
+
+      // 1) Normal query params
       const q = parseQuery(url);
       const k = Object.fromEntries(Object.entries(q).map(([a,b]) => [a.toLowerCase(), String(b)]));
+
       const pl = k.placementid || k.plid || k.placement || null;
       const ad = k.adid || k.ad || k.ad_id || null;
       const cr = k.crid || k.creative || k.creativeid || k.cid || null;
+
       if (pl && !idState.placementId) { idState.placementId = pl; setIdValue('placementIdValue', pl); noteId(`Placement ID from ${shorten(url)}`); }
       if (ad && !idState.adId)        { idState.adId        = ad; setIdValue('adIdValue', ad);       noteId(`Ad ID from ${shorten(url)}`); }
       if (cr && !idState.creativeId)  { idState.creativeId  = cr; setIdValue('creativeIdValue', cr);  noteId(`Creative ID from ${shorten(url)}`); }
+
+      // 2) Deeply encoded segments (common in CM360 redirects)
+      if (!idState.placementId || !idState.adId || !idState.creativeId) {
+        updateIdsFromString(url, shorten(url));
+      }
     }
 
-    // === Creative sandbox loader + instrumentation ===
+    // === Creative sandbox loader + child-iframe instrumentation ===
     function runTagInSandbox(tagContent) {
       const creativeDiv = document.getElementById("creative");
 
@@ -210,13 +250,82 @@
       iframe.style.border = '1px solid #ccc';
       wrapper.appendChild(iframe);
 
-      // Minimal hooks inside the sandbox to report network-ish activity
       const BOOTSTRAP = `
         <script>
           (function(){
             function send(kind, url, extra){ try{ parent.postMessage({kind, url, extra}, '*'); }catch(e){} }
 
-            // fetch
+            // Child hooks that we inject into about:blank iframes created by the tag
+            const CHILD_HOOKS = \\`
+              (function(){
+                function send(kind, url, extra){ try{ parent.postMessage({kind, url, extra}, '*'); }catch(e){} }
+                const _fetch = window.fetch;
+                window.fetch = function(...args){
+                  const u = (args[0] && args[0].url) ? args[0].url : String(args[0]);
+                  send('fetch-init', u, {});
+                  return _fetch.apply(this, args).then(r => { send('fetch-done', u, {status:r.status}); return r; })
+                                                 .catch(err => { send('fetch-error', u, {message:err && err.message}); throw err; });
+                };
+                const _XHR = window.XMLHttpRequest;
+                window.XMLHttpRequest = function(){
+                  const xhr = new _XHR(); const _open = xhr.open;
+                  xhr.open = function(method, url, ...rest){ xhr.__u=url; send('xhr-open', url, {method}); return _open.apply(this,[method,url,...rest]); };
+                  xhr.addEventListener('load', ()=>send('xhr-done', xhr.__u||'', {status:xhr.status}));
+                  xhr.addEventListener('error',()=>send('xhr-error',xhr.__u||'',{}));
+                  return xhr;
+                };
+                if (navigator && navigator.sendBeacon){
+                  const _b = navigator.sendBeacon.bind(navigator);
+                  navigator.sendBeacon = function(url, data){ send('beacon', String(url||''), {}); return _b(url, data); };
+                }
+                try{ const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLImageElement.prototype,'src',{set(v){send('img-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
+                try{ const d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLScriptElement.prototype,'src',{set(v){send('script-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
+                try{ const d=Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype,'href'); if(d&&d.set) Object.defineProperty(HTMLLinkElement.prototype,'href',{set(v){send('link-href',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
+                try{
+                  if('PerformanceObserver' in window){
+                    const po=new PerformanceObserver(list=>{ list.getEntries().forEach(ent=>{ if(ent && ent.name) send('perf-entry', ent.name, {type:ent.initiatorType}); });});
+                    po.observe({entryTypes:['resource']});
+                  }
+                }catch(e){ send('perf-error','',{message:e.message}); }
+                const _w = document.write.bind(document), _wl = document.writeln.bind(document);
+                function sniff(args){ try{ const s=Array.from(args).join(''); (s.match(/https?:\\\\/\\\\/[^\\"'>\\\\s)]+/gi)||[]).forEach(u=>send('doc-url',u,{})); }catch(e){} }
+                document.write   = function(){ sniff(arguments); return _w.apply(document, arguments); };
+                document.writeln = function(){ sniff(arguments); return _wl.apply(document, arguments); };
+                send('child-hooks-ready', location.href, {});
+              })();
+            \\`;
+
+            function injectChildHooks(frame){
+              try{
+                if (!frame) return;
+                const src = (frame.getAttribute('src')||'').trim();
+                if (src && src !== 'about:blank' && !src.startsWith('javascript:') && !src.startsWith('data:')) return; // only about:blank/data/js
+                const d = frame.contentDocument || (frame.contentWindow && frame.contentWindow.document);
+                if (d && d.documentElement){
+                  const s = d.createElement('script');
+                  s.textContent = CHILD_HOOKS;
+                  d.documentElement.appendChild(s);
+                  send('child-instrumented', src || '(about:blank)', {});
+                }
+              }catch(_){}
+            }
+
+            // Observe added nodes and iframe src changes
+            try{
+              const mo = new MutationObserver(muts=>{
+                muts.forEach(m=>{
+                  (m.addedNodes||[]).forEach(n=>{
+                    if(n && n.tagName==='IFRAME'){ injectChildHooks(n); }
+                  });
+                  if(m.type==='attributes' && m.target && m.target.tagName==='IFRAME'){
+                    injectChildHooks(m.target);
+                  }
+                });
+              });
+              mo.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+            }catch(e){ send('mo-error','',{message:e.message}); }
+
+            // Top-frame hooks
             const _fetch = window.fetch;
             window.fetch = function(...args){
               const u = (args[0] && args[0].url) ? args[0].url : String(args[0]);
@@ -225,7 +334,6 @@
                                              .catch(err => { send('fetch-error', u, {message:err && err.message}); throw err; });
             };
 
-            // XHR
             const _XHR = window.XMLHttpRequest;
             window.XMLHttpRequest = function(){
               const xhr = new _XHR(); const _open = xhr.open;
@@ -235,18 +343,15 @@
               return xhr;
             };
 
-            // sendBeacon
             if (navigator && navigator.sendBeacon){
               const _b = navigator.sendBeacon.bind(navigator);
               navigator.sendBeacon = function(url, data){ send('beacon', String(url||''), {}); return _b(url, data); };
             }
 
-            // Property setters (img/script/link src/href) to catch pixel-style loads
             try{ const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLImageElement.prototype,'src',{set(v){send('img-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
             try{ const d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLScriptElement.prototype,'src',{set(v){send('script-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
             try{ const d=Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype,'href'); if(d&&d.set) Object.defineProperty(HTMLLinkElement.prototype,'href',{set(v){send('link-href',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
 
-            // Performance entries for resources (catches image/gif pixels)
             try{
               if('PerformanceObserver' in window){
                 const po=new PerformanceObserver(list=>{ list.getEntries().forEach(ent=>{ if(ent && ent.name) send('perf-entry', ent.name, {type:ent.initiatorType}); });});
@@ -254,9 +359,8 @@
               }
             }catch(e){ send('perf-error','',{message:e.message}); }
 
-            // document.write sniff (common in tags)
             const _w = document.write.bind(document), _wl = document.writeln.bind(document);
-            function sniff(args){ try{ const s=Array.from(args).join(''); (s.match(/https?:\\/\\/[^"'>\\s)]+/gi)||[]).forEach(u=>send('doc-url',u,{})); }catch(e){} }
+            function sniff(args){ try{ const s=Array.from(args).join(''); (s.match(/https?:\\\\/\\\\/[^\\"'>\\\\s)]+/gi)||[]).forEach(u=>send('doc-url',u,{})); }catch(e){} }
             document.write   = function(){ sniff(arguments); return _w.apply(document, arguments); };
             document.writeln = function(){ sniff(arguments); return _wl.apply(document, arguments); };
 
@@ -265,7 +369,7 @@
         <\/script>
       `;
 
-      // Load the tag content inside the iframe + our bootstrap
+      // Load the tag content + bootstrap
       iframe.srcdoc = `
         <!doctype html>
         <html>
@@ -289,7 +393,7 @@
       };
     }
 
-    // Parent-side handler for sandbox messages -> logNetworkActivity
+    // Parent listener to log sandbox & child-frame events
     if (!window.__cm360SandboxListener) {
       window.__cm360SandboxListener = true;
       window.addEventListener('message', (evt) => {
@@ -297,6 +401,8 @@
         if (!d || !d.kind) return;
         const label = {
           'bootstrap-ready':'Sandbox ready',
+          'child-hooks-ready':'Child iframe ready',
+          'child-instrumented':'Child iframe instrumented',
           'fetch-init':'Fetch request initiated',
           'fetch-done':'Fetch request completed',
           'fetch-error':'Fetch request failed',
@@ -309,7 +415,8 @@
           'link-href':'Link href set',
           'perf-entry':'Resource performance entry',
           'perf-error':'PerformanceObserver error',
-          'doc-url':'URL found in document.write'
+          'doc-url':'URL found in document.write',
+          'mo-error':'MutationObserver error'
         }[d.kind] || d.kind;
 
         const status = /error/i.test(d.kind) ? 'error' : 'success';
@@ -317,7 +424,7 @@
       });
     }
 
-    // ---- Boot (unchanged) ----
+    // ---- Boot ----
     initializePixelTracking();
     const params = new URLSearchParams(window.location.search);
     const rawTag = decodeURIComponent(params.get("tag") || "");
@@ -328,7 +435,12 @@
 
     if (rawTag && rawTag.trim()) {
       expectedPixels.forEach(p => markPixelPending(p.name));
+
+      // Pre-seed IDs from any URLs inside the raw tag (helps CM360 nested encodes)
+      try { (rawTag.match(/https?:\/\/[^"'>\s)]+/gi) || [] }.forEach(u => updateIdsFromUrl(u)); } catch(_){}
+
       runTagInSandbox(rawTag);
+
       setTimeout(() => {
         expectedPixels.forEach(pixel => {
           if (pixelStatus[pixel.name] === 'pending') {

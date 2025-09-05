@@ -66,19 +66,19 @@
   </div>
 
   <script>
-    // ---- Expected pixels list ----
+    // ---- Expected pixels list (tuned) ----
     const expectedPixels = [
       { name: "CM360/DoubleClick", patterns: ["doubleclick.net", "googleadservices.com", "googlesyndication.com", "dcmads.js", "fls.doubleclick.net"] },
-      { name: "LiveRamp", patterns: ["di.rlcdn.com", "liveramp.com"] },
-      { name: "Connect", patterns: ["hrzn-nxt.com", "horizon-nxt.com"] },
-      { name: "Meta/Facebook", patterns: ["facebook.com/tr", "connect.facebook.net"] },
-      { name: "Google Ads", patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
-      { name: "DoubleVerify", patterns: ["cdn.doubleverify.com"] },
-      { name: "iSpot", patterns: ["ispot.tv/"] },
-      { name: "Generic Pixel", patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
+      { name: "LiveRamp",         patterns: ["di.rlcdn.com", "liveramp.com"] },
+      { name: "Connect",          patterns: ["hrzn-nxt.com", "horizon-nxt.com"] },
+      { name: "Meta/Facebook",    patterns: ["facebook.com/tr", "connect.facebook.net"] },
+      { name: "Google Ads",       patterns: ["googleads.g.doubleclick.net", "google-analytics.com", "googletagmanager.com"] },
+      { name: "DoubleVerify",     patterns: ["doubleverify.com"] }, // matches cdn/tps/etc subdomains
+      { name: "iSpot",            patterns: ["ispot.tv"] },         // matches pi.ispot.tv, r.ispot.tv, etc.
+      { name: "Generic Pixel",    patterns: [".gif", ".png", ".jpg", "pixel", "tracking"] }
     ];
 
-    // ---- Pixel status helpers ----
+    // ---- Pixel status + helpers ----
     const pixelStatus = {};
     const networkLog = [];
     let networkLogElement, pixelListElement;
@@ -131,6 +131,8 @@
       logEntry.textContent = `[${timestamp}] ${description}: ${url}`;
       networkLogElement.appendChild(logEntry);
       networkLogElement.scrollTop = networkLogElement.scrollHeight;
+
+      // detect & parse after logging
       setTimeout(() => checkPixelUrl(url), 0);
       updateIdsFromUrl(url);
     }
@@ -147,7 +149,7 @@
 
     function clearNetworkLog() { networkLog.length = 0; networkLogElement.innerHTML = ''; }
 
-    // ---- Pixel URL matcher ----
+    // ---- Smarter matching ----
     function checkPixelUrl(url) {
       if (!url || typeof url !== 'string') return;
       let full = "", host = "";
@@ -159,10 +161,10 @@
       expectedPixels.forEach(pixel => {
         const hit = pixel.patterns.some(pat => {
           const p = String(pat).toLowerCase().trim();
-          if (p.includes(".") && !p.startsWith("/") && host) {
+          if (p.includes(".") && !p.startsWith("/") && host) { // domain-like
             if (host === p || host.endsWith("." + p)) return true;
           }
-          return full.includes(p);
+          return full.includes(p); // substring fallback
         });
         if (hit) markPixelFired(pixel.name, url);
       });
@@ -216,10 +218,11 @@
       iframe.style.width = '300px'; iframe.style.height = '250px'; iframe.style.border = '1px solid #ccc';
       wrapper.appendChild(iframe);
 
-      // Build a bootstrap script without tricky nested backticks
+      // Hook function that we inject into the sandbox (and into about:blank child iframes)
       function hookWindow() {
         function send(kind, url, extra){ try{ top.postMessage({kind, url, extra}, '*'); }catch(e){} }
-        // basic hooks
+
+        // fetch
         const _fetch = window.fetch;
         window.fetch = function(...args){
           const u = (args[0] && args[0].url) ? args[0].url : String(args[0]);
@@ -227,6 +230,8 @@
           return _fetch.apply(this, args).then(r=>{ send('fetch-done', u, {status:r.status}); return r; })
                                          .catch(err=>{ send('fetch-error', u, {message:err && err.message}); throw err; });
         };
+
+        // XHR
         const _XHR = window.XMLHttpRequest;
         window.XMLHttpRequest = function(){
           const xhr = new _XHR(); const _open = xhr.open;
@@ -235,17 +240,32 @@
           xhr.addEventListener('error',()=>send('xhr-error',xhr.__u||'',{}));
           return xhr;
         };
+
+        // sendBeacon
         if (navigator && navigator.sendBeacon){
           const _b = navigator.sendBeacon.bind(navigator);
           navigator.sendBeacon = function(url, data){ send('beacon', String(url||''), {}); return _b(url, data); };
         }
+
+        // property setters (img/script/link)
         try{ const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLImageElement.prototype,'src',{set(v){send('img-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
         try{ const d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src'); if(d&&d.set) Object.defineProperty(HTMLScriptElement.prototype,'src',{set(v){send('script-src',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
         try{ const d=Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype,'href'); if(d&&d.set) Object.defineProperty(HTMLLinkElement.prototype,'href',{set(v){send('link-href',String(v),{}); return d.set.call(this,v);}, get(){return d.get.call(this);}});}catch(e){}
+
+        // Perf observer + FLUSH existing entries so fast pixels are captured
         try{
           if('PerformanceObserver' in window){
-            const po=new PerformanceObserver(list=>{ list.getEntries().forEach(ent=>{ if(ent && ent.name) send('perf-entry', ent.name, {type:ent.initiatorType}); });});
+            const po=new PerformanceObserver(list=>{
+              list.getEntries().forEach(ent=>{ if(ent && ent.name) send('perf-entry', ent.name, {type:ent.initiatorType}); });
+            });
             po.observe({entryTypes:['resource']});
+          }
+        }catch(e){ send('perf-error','',{message:e.message}); }
+        try{
+          if ('performance' in window && performance.getEntriesByType) {
+            performance.getEntriesByType('resource').forEach(ent=>{
+              if(ent && ent.name) send('perf-entry', ent.name, {type: ent.initiatorType});
+            });
           }
         }catch(e){ send('perf-error','',{message:e.message}); }
 
@@ -309,7 +329,6 @@
           'link-href':'Link href set',
           'perf-entry':'Resource performance entry',
           'perf-error':'PerformanceObserver error',
-          'doc-url':'URL found in document.write',
           'mo-error':'MutationObserver error'
         }[d.kind] || d.kind;
         const status = /error/i.test(d.kind) ? 'error' : 'success';
@@ -329,7 +348,7 @@
     if (rawTag && rawTag.trim()) {
       expectedPixels.forEach(p => markPixelPending(p.name));
 
-      // Pre-seed IDs from URLs found in the raw tag (fixed syntax)
+      // Pre-seed IDs from URLs found in the raw tag (best-effort)
       try {
         const urlsInTag = (rawTag.match(/https?:\/\/[^"'>\s)]+/gi) || []).slice(0, 30);
         urlsInTag.forEach(u => updateIdsFromUrl(u));
@@ -337,6 +356,7 @@
 
       runTagInSandbox(rawTag);
 
+      // 12s timeout (unchanged)
       setTimeout(() => {
         expectedPixels.forEach(pixel => {
           if (pixelStatus[pixel.name] === 'pending') {
